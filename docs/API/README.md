@@ -124,8 +124,6 @@ POST /api/wiki/:filename
 }
 ```
 
-## 今後実装予定のエンドポイント
-
 ### ドキュメント検索
 
 ```
@@ -133,6 +131,51 @@ GET /api/wiki/search?q=検索クエリ
 ```
 
 ドキュメント内の内容を検索します。
+
+#### パラメータ
+
+- `q`: 検索するテキスト
+
+#### レスポンス
+
+**成功時 (200 OK)**
+
+```json
+{
+  "results": [
+    {
+      "filename": "welcome",
+      "content_preview": "This is a welcome document with a search term.",
+      "matches": 3
+    },
+    {
+      "filename": "example",
+      "content_preview": "Another document with the search term.",
+      "matches": 1
+    }
+  ],
+  "query": "search term",
+  "total_matches": 4
+}
+```
+
+**エラー時 (400 Bad Request)**
+
+```json
+{
+  "error": "Search query cannot be empty"
+}
+```
+
+**エラー時 (500 Internal Server Error)**
+
+```json
+{
+  "error": "Failed to read markdown directory: [エラーメッセージ]"
+}
+```
+
+## 今後実装予定のエンドポイント
 
 ### ドキュメント履歴の取得
 
