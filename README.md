@@ -62,6 +62,13 @@ md-wiki-rust/
 │   └── Cargo.toml
 ├── storage
 │   └── markdown_files (別Gitリポジトリとして管理)
+├── docs
+│   ├── API
+│   │   └── README.md (API仕様書)
+│   ├── DEVELOPMENT
+│   │   └── README.md (開発計画)
+│   └── SETUP
+│       └── README.md (セットアップ手順)
 ├── README.md
 └── .gitignore
 ```
