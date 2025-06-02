@@ -10,6 +10,7 @@ pub use documents::*;
 pub use users::*;
 pub use tags::*;
 
+#[derive(Clone)]
 pub struct DbManager {
     conn: Arc<Mutex<Connection>>,
 }
