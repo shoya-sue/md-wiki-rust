@@ -9,6 +9,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod handlers;
 mod routes;
+mod git_ops;
 
 #[derive(Clone)]
 pub struct AppState {
