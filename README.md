@@ -21,7 +21,7 @@ Rustを用いてMarkdownファイルを共有・編集できるGUIベースのWi
 * **Tauri**
 
   * 軽量、高速で安全なRustベースのElectron代替ツール。
-  * ReactまたはVueをフロントエンドフレームワークとして使用可能。
+  * Reactをフロントエンドフレームワークとして使用。
 
 ### バックエンド（Rust API）
 
@@ -34,16 +34,26 @@ Rustを用いてMarkdownファイルを共有・編集できるGUIベースのWi
 
 ### データストア
 
-* Markdownファイルのバージョン管理はGitを推奨。
-* SQLiteを使用してメタデータ管理。
+* Markdownファイルのバージョン管理はGitを使用。
+* ~~SQLiteを使用してメタデータ管理。~~ （未実装）
 
-## 推奨リポジトリ構造
+## リポジトリ構造
 
 ```
 md-wiki-rust/
 ├── frontend
 │   ├── src
-│   └── public
+│   │   ├── components
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── styles.css
+│   ├── src-tauri
+│   │   ├── src
+│   │   ├── Cargo.toml
+│   │   ├── build.rs
+│   │   └── tauri.conf.json
+│   ├── index.html
+│   └── package.json
 ├── backend
 │   ├── src
 │   │   ├── routes
@@ -51,21 +61,25 @@ md-wiki-rust/
 │   │   └── main.rs
 │   └── Cargo.toml
 ├── storage
-│   └── markdown_files
-├── scripts
-│   ├── deploy.sh
-│   └── setup.sh
+│   └── markdown_files (別Gitリポジトリとして管理)
 ├── README.md
-└── LICENSE
+└── .gitignore
 ```
 
-## 主な機能
+## 現在実装されている機能
 
 * Markdownファイル作成・編集
-* ファイル履歴の表示（Git統合）
-* Markdownプレビュー
+* Markdownプレビュー表示
+* バックエンドAPIによるファイル管理
+* TauriによるデスクトップGUI
+
+## 今後実装予定の機能
+
+* ファイル履歴の表示（Git統合の強化）
 * 検索機能
 * 編集権限設定（オプション）
+* SQLiteによるメタデータ管理
+* スクリプトによるデプロイ・セットアップ自動化
 
 ## セットアップ手順
 
@@ -75,31 +89,35 @@ md-wiki-rust/
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-### 2. Tauriのセットアップ
+### 2. Node.js環境構築
+
+最新のNode.jsとnpmをインストールしてください。
+
+### 3. プロジェクトのクローン
 
 ```bash
-npm create tauri-app@latest
-# ReactまたはVueを選択
+git clone https://github.com/yourusername/md-wiki-rust.git
+cd md-wiki-rust
 ```
 
-### 3. バックエンド構築（Axum）
+### 4. バックエンドの依存関係インストール
 
 ```bash
-cargo new backend
 cd backend
-cargo add axum tokio serde serde_json pulldown-cmark
+cargo build
 ```
 
-### 4. データストア初期化（SQLite）
+### 5. フロントエンドの依存関係インストール
 
 ```bash
-cargo add rusqlite
+cd frontend
+npm install
 ```
 
-### 5. Gitリポジトリ初期化
+### 6. Markdownファイル用のGitリポジトリ初期化
 
 ```bash
-mkdir storage/markdown_files
+mkdir -p storage/markdown_files
 cd storage/markdown_files
 git init
 ```
