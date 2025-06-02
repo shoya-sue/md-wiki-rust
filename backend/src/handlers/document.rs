@@ -310,4 +310,176 @@ pub async fn get_document_version(
             })),
         )),
     }
+}
+
+// ドキュメントを削除する
+pub async fn delete_document(
+    State(state): State<AppState>,
+    Path(filename): Path<String>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let file_path = state.markdown_dir.join(format!("{}.md", filename));
+    
+    // ファイルが存在するか確認
+    if !file_path.exists() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": format!("Document {} not found", filename)
+            })),
+        ));
+    }
+    
+    // ファイルを削除
+    match fs::remove_file(&file_path) {
+        Ok(_) => {
+            // Gitオペレーションを初期化
+            let git_ops = match GitOps::new(&state.markdown_dir) {
+                Ok(ops) => ops,
+                Err(e) => {
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({
+                            "error": format!("Failed to initialize Git operations: {}", e)
+                        })),
+                    ));
+                }
+            };
+            
+            // ファイル削除をコミット
+            let commit_message = format!("Delete {}.md", filename);
+            match git_ops.remove_file(&format!("{}.md", filename), &commit_message) {
+                Ok(_) => {
+                    // データベースからメタデータも削除
+                    if let Some(db) = &state.db_manager {
+                        // エラーが発生しても処理は続行（ファイルは削除済み）
+                        if let Err(e) = db.delete_document_metadata(&filename) {
+                            tracing::warn!("Failed to delete metadata for {}: {}", filename, e);
+                        }
+                    }
+                    
+                    Ok(StatusCode::OK)
+                },
+                Err(e) => Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to commit document deletion: {}", e)
+                    })),
+                )),
+            }
+        },
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": format!("Failed to delete document: {}", e)
+            })),
+        )),
+    }
+}
+
+// 新しいドキュメントを作成
+pub async fn create_document(
+    State(state): State<AppState>,
+    Json(document): Json<Document>,
+) -> Result<Json<Document>, (StatusCode, Json<serde_json::Value>)> {
+    let filename = document.filename.clone();
+    let file_path = state.markdown_dir.join(format!("{}.md", filename));
+    
+    // 同名のファイルが既に存在するか確認
+    if file_path.exists() {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "error": format!("Document {} already exists", filename)
+            })),
+        ));
+    }
+    
+    // ファイルを作成
+    match fs::write(&file_path, &document.content) {
+        Ok(_) => {
+            // Gitコミットを作成
+            let git_ops = match GitOps::new(&state.markdown_dir) {
+                Ok(ops) => ops,
+                Err(e) => {
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({
+                            "error": format!("Failed to initialize Git operations: {}", e)
+                        })),
+                    ));
+                }
+            };
+            
+            let commit_message = format!("Create {}.md", filename);
+            match git_ops.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
+                Ok(_) => Ok(Json(document)),
+                Err(e) => Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to commit document: {}", e)
+                    })),
+                )),
+            }
+        },
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": format!("Failed to create document: {}", e)
+            })),
+        )),
+    }
+}
+
+// ドキュメントを更新
+pub async fn update_document(
+    State(state): State<AppState>,
+    Path(filename): Path<String>,
+    Json(document): Json<Document>,
+) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+    let file_path = state.markdown_dir.join(format!("{}.md", filename));
+    
+    // ファイルが存在するか確認
+    if !file_path.exists() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "error": format!("Document {} not found", filename)
+            })),
+        ));
+    }
+    
+    // ファイルを更新
+    match fs::write(&file_path, &document.content) {
+        Ok(_) => {
+            // Gitコミットを作成
+            let git_ops = match GitOps::new(&state.markdown_dir) {
+                Ok(ops) => ops,
+                Err(e) => {
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({
+                            "error": format!("Failed to initialize Git operations: {}", e)
+                        })),
+                    ));
+                }
+            };
+            
+            let commit_message = format!("Update {}.md", filename);
+            match git_ops.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
+                Ok(_) => Ok(StatusCode::OK),
+                Err(e) => Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to commit document: {}", e)
+                    })),
+                )),
+            }
+        },
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": format!("Failed to update document: {}", e)
+            })),
+        )),
+    }
 } 
