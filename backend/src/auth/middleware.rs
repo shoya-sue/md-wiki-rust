@@ -1,112 +1,63 @@
 use axum::{
-    extract::{Request, State},
-    http::{HeaderMap, StatusCode},
+    extract::State,
     middleware::Next,
     response::Response,
-    Json,
+    http::{Request, StatusCode},
+    response::IntoResponse,
 };
-use futures::future::BoxFuture;
-use std::sync::Arc;
-use crate::auth::jwt;
-use crate::models::UserRole;
-use crate::AppState;
+use crate::{
+    AppState,
+    AppError,
+    auth::jwt::{self, Claims},
+    models::user::UserRole,
+};
 
 // 認証ミドルウェア
-pub async fn auth_middleware(
+pub async fn require_auth<B>(
     State(state): State<AppState>,
-    headers: HeaderMap,
-    request: Request,
-    next: Next,
-) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
-    // Authorizationヘッダーからトークンを取得
-    let auth_header = headers
+    mut request: Request<B>,
+    next: Next<B>,
+) -> Result<Response, AppError> {
+    let auth_header = request
+        .headers()
         .get("Authorization")
-        .and_then(|header| header.to_str().ok());
-    
-    if let Some(auth_header) = auth_header {
-        // "Bearer "プレフィックスを削除してトークンを取得
-        if auth_header.starts_with("Bearer ") {
-            let token = &auth_header[7..];
-            
-            // トークンを検証
-            match jwt::verify_token(token) {
-                Ok(claims) => {
-                    // リクエストの拡張データにユーザー情報を追加
-                    let mut request = request;
-                    request.extensions_mut().insert(claims);
-                    
-                    // 次のハンドラーに処理を委譲
-                    return Ok(next.run(request).await);
-                },
-                Err(e) => {
-                    return Err((
-                        StatusCode::UNAUTHORIZED,
-                        Json(serde_json::json!({
-                            "error": format!("Invalid token: {}", e)
-                        })),
-                    ));
-                }
-            }
-        }
+        .and_then(|header| header.to_str().ok())
+        .ok_or_else(|| AppError::Authentication("No authorization header".into()))?;
+
+    if !auth_header.starts_with("Bearer ") {
+        return Err(AppError::Authentication("Invalid authorization header".into()));
     }
-    
-    Err((
-        StatusCode::UNAUTHORIZED,
-        Json(serde_json::json!({
-            "error": "Authorization header missing or invalid"
-        })),
-    ))
+
+    let token = &auth_header["Bearer ".len()..];
+    let claims = jwt::verify_token(token)
+        .map_err(|e| AppError::Authentication(e.to_string()))?;
+
+    request.extensions_mut().insert(claims);
+    Ok(next.run(request).await)
 }
 
-// ロールベースのアクセス制御ミドルウェア
-pub fn require_role(role: UserRole) -> impl Fn(Request, Next) -> BoxFuture<'static, Response> {
-    move |request: Request, next: Next| {
-        let fut = async move {
-            // リクエストの拡張データからJWTクレームを取得
-            if let Some(claims) = request.extensions().get::<jwt::Claims>() {
-                // ユーザーロールを比較
-                let user_role = UserRole::from_str(&claims.role);
-                
-                // Admin > Editor > Viewer の順で権限が高い
-                let has_permission = match role {
-                    UserRole::Admin => user_role == UserRole::Admin,
-                    UserRole::Editor => user_role == UserRole::Admin || user_role == UserRole::Editor,
-                    UserRole::Viewer => true, // すべてのロールがViewerの権限を持つ
-                };
-                
-                if has_permission {
-                    // 権限があれば次のハンドラーに処理を委譲
-                    return next.run(request).await;
-                }
-                
-                // 権限がなければ403エラー
-                return Response::builder()
-                    .status(StatusCode::FORBIDDEN)
-                    .header("Content-Type", "application/json")
-                    .body(
-                        serde_json::to_string(&serde_json::json!({
-                            "error": "Insufficient permissions"
-                        }))
-                        .unwrap()
-                        .into(),
-                    )
-                    .unwrap();
-            }
-            
-            // クレームがなければ認証エラー（auth_middlewareを通過していないか、リクエストが改ざんされている）
-            Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .header("Content-Type", "application/json")
-                .body(
-                    serde_json::to_string(&serde_json::json!({
-                        "error": "Authentication required"
-                    }))
-                    .unwrap()
-                    .into(),
-                )
-                .unwrap()
-        };
-        
-        Box::pin(fut)
+pub async fn require_role<B>(
+    required_role: UserRole,
+    mut request: Request<B>,
+    next: Next<B>,
+) -> Result<Response, AppError> {
+    let claims = request
+        .extensions()
+        .get::<Claims>()
+        .ok_or_else(|| AppError::Authorization("No claims found".into()))?;
+
+    let user_role = UserRole::from_str(&claims.role);
+    if !user_role.has_permission(&required_role) {
+        return Err(AppError::Authorization("Insufficient permissions".into()));
     }
+
+    Ok(next.run(request).await)
+}
+
+pub fn auth_layer<B>() -> axum::middleware::from_fn::FromFn<impl Fn(Request<B>, Next<B>) -> impl std::future::Future<Output = Response> + Clone> {
+    axum::middleware::from_fn(require_auth)
+}
+
+pub fn role_layer<B>(role: UserRole) -> axum::middleware::from_fn::FromFn<impl Fn(Request<B>, Next<B>) -> impl std::future::Future<Output = Response> + Clone> {
+    axum::middleware::from_fn(move |req, next| require_role(role, req, next))
 } 

@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::models::User;
 
 // JWTクレーム
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     // サブジェクト（ユーザーID）
     pub sub: String,
@@ -16,6 +16,24 @@ pub struct Claims {
     pub iat: u64,
     // 有効期限
     pub exp: u64,
+}
+
+impl Claims {
+    pub fn new(username: &str, role: &str, expiration: usize) -> Self {
+        Claims {
+            sub: username.to_string(),
+            username: username.to_string(),
+            role: role.to_string(),
+            iat: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs(),
+            exp: (SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs() + expiration as u64),
+        }
+    }
 }
 
 // JWTの秘密鍵
