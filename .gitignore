@@ -26,3 +26,19 @@ storage/markdown_files/
 # Keep the storage directory structure
 !storage/
 !storage/.gitkeep
+
+
+# FrontEnd
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/coverage/
+frontend/package-lock.json
+
+
+# BackEnd
+backend/target/
+backend/Cargo.lock
+backend/Cargo.toml
+backend/Cargo.lock
+backend/Cargo.toml
