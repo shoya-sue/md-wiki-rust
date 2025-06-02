@@ -1,111 +1,159 @@
 # セットアップ手順
 
-このドキュメントでは、md-wiki-rustプロジェクトの開発環境のセットアップ方法と実行方法について説明します。
+## 必要な環境
 
-## 前提条件
+### 1. Rust環境
+- Rust 1.73.0以上
+- Cargo（Rustのパッケージマネージャー）
 
-以下のソフトウェアがインストールされていることを確認してください：
+### 2. Node.js環境
+- Node.js 18.0.0以上
+- npm 8.0.0以上
 
-- Rust (rustc 1.74.0以上)
-- Node.js (v20.0.0以上)
-- npm (9.0.0以上)
-- Git
+### 3. 開発ツール
+- Git 2.0.0以上
+- SQLite 3.0.0以上
+- OpenSSL開発パッケージ
 
-## 開発環境のセットアップ
+## インストール手順
 
-### 1. リポジトリのクローン
+### 1. Rust環境のセットアップ
 
 ```bash
+# Rustupのインストール
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Rustのバージョン確認
+rustc --version
+cargo --version
+
+# 必要に応じて安定版に更新
+rustup update stable
+rustup default stable
+```
+
+### 2. Node.js環境のセットアップ
+
+```bash
+# Node.jsとnpmのインストール（OS依存）
+# 例：Ubuntu/Debian
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# バージョン確認
+node --version
+npm --version
+```
+
+### 3. 必要なパッケージのインストール
+
+#### Ubuntu/Debian
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential \
+  pkg-config \
+  libssl-dev \
+  sqlite3 \
+  libsqlite3-dev
+```
+
+#### RHEL/CentOS/AlmaLinux
+```bash
+sudo dnf groupinstall "Development Tools"
+sudo dnf install \
+  openssl-devel \
+  sqlite \
+  sqlite-devel \
+  pkg-config
+```
+
+#### macOS
+```bash
+brew install \
+  openssl \
+  sqlite \
+  pkg-config
+```
+
+### 4. プロジェクトのセットアップ
+
+```bash
+# リポジトリのクローン
 git clone https://github.com/yourusername/md-wiki-rust.git
 cd md-wiki-rust
-```
 
-### 2. バックエンドのセットアップ
-
-```bash
+# バックエンドの依存関係インストール
 cd backend
 cargo build
-```
 
-### 3. フロントエンドのセットアップ
-
-```bash
-cd frontend
+# フロントエンドの依存関係インストール
+cd ../frontend
 npm install
-```
 
-### 4. Markdownファイル用のGitリポジトリの初期化
-
-```bash
-mkdir -p storage/markdown_files
-cd storage/markdown_files
+# Markdownファイル用のGitリポジトリ初期化
+cd ../storage
+mkdir -p markdown_files
+cd markdown_files
 git init
 ```
 
-## アプリケーションの実行
+## 開発環境の起動
 
-### バックエンドの実行
+### バックエンドの起動
 
 ```bash
 cd backend
 cargo run
 ```
 
-これにより、APIサーバーがポート3000で起動します。
-
-### フロントエンドの実行
-
-別のターミナルで以下のコマンドを実行します：
+### フロントエンドの起動
 
 ```bash
 cd frontend
 npm run tauri dev
 ```
 
-これにより、Tauriアプリケーションが開発モードで起動します。
-
-## ビルド方法
-
-### バックエンドのビルド
-
-```bash
-cd backend
-cargo build --release
-```
-
-### フロントエンドのビルド
-
-```bash
-cd frontend
-npm run tauri build
-```
-
-ビルドされたアプリケーションは `frontend/src-tauri/target/release` ディレクトリに作成されます。
-
 ## トラブルシューティング
 
-### バックエンドの起動に失敗する場合
+### OpenSSLの問題
 
-- ポート3000が他のアプリケーションで使用されていないか確認してください。
-- ファイアウォールの設定を確認してください。
-
-### フロントエンドのビルドに失敗する場合
-
-- Node.jsとnpmのバージョンを確認してください。
-- 依存関係が正しくインストールされているか確認してください。
+環境変数の設定が必要な場合：
 
 ```bash
-cd frontend
-npm ci
+export OPENSSL_DIR=/usr/local/opt/openssl  # macOSの場合
+export OPENSSL_DIR=/usr                    # Linux系の場合
 ```
 
-### Tauriのビルドに失敗する場合
+### SQLiteの問題
 
-- Rustのバージョンを確認してください。
-- OSに必要な開発ツールがインストールされているか確認してください。
-  - Windows: Visual Studio BuildTools
-  - macOS: Xcode Command Line Tools
-  - Linux: 必要なライブラリ（libwebkit2gtk-4.0-dev など）
+権限の確認：
+
+```bash
+# データベースディレクトリの作成と権限設定
+mkdir -p storage
+chmod 755 storage
+```
+
+### Rustのビルドエラー
+
+キャッシュのクリーンアップ：
+
+```bash
+cargo clean
+cargo update
+cargo build
+```
+
+### Node.jsの依存関係エラー
+
+npmキャッシュのクリア：
+
+```bash
+npm cache clean --force
+rm -rf node_modules
+npm install
+```
 
 ## 開発リソース
 

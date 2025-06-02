@@ -418,3 +418,191 @@ GET /api/wiki/:filename/version/:commit_id
 ### メタデータの取得と更新
 
 ```
+```
+
+## 認証API
+
+### POST /api/auth/register
+新規ユーザー登録
+
+**リクエスト**
+```json
+{
+  "username": "string",
+  "password": "string",
+  "role": "string" // "admin", "editor", "viewer"のいずれか
+}
+```
+
+**レスポンス**
+```json
+{
+  "token": "string", // JWTトークン
+  "user": {
+    "id": "number",
+    "username": "string",
+    "role": "string"
+  }
+}
+```
+
+### POST /api/auth/login
+ログイン
+
+**リクエスト**
+```json
+{
+  "username": "string",
+  "password": "string"
+}
+```
+
+**レスポンス**
+```json
+{
+  "token": "string", // JWTトークン
+  "user": {
+    "id": "number",
+    "username": "string",
+    "role": "string"
+  }
+}
+```
+
+## ドキュメントAPI
+
+### GET /api/documents
+ドキュメント一覧取得
+
+**レスポンス**
+```json
+{
+  "documents": [
+    {
+      "id": "number",
+      "filename": "string",
+      "title": "string",
+      "created_at": "string",
+      "updated_at": "string",
+      "tags": ["string"]
+    }
+  ]
+}
+```
+
+### GET /api/documents/{filename}
+ドキュメント取得
+
+**レスポンス**
+```json
+{
+  "content": "string",
+  "metadata": {
+    "id": "number",
+    "filename": "string",
+    "title": "string",
+    "created_at": "string",
+    "updated_at": "string",
+    "tags": ["string"]
+  }
+}
+```
+
+### POST /api/documents
+ドキュメント作成
+
+**リクエスト**
+```json
+{
+  "filename": "string",
+  "content": "string",
+  "title": "string",
+  "tags": ["string"]
+}
+```
+
+### PUT /api/documents/{filename}
+ドキュメント更新
+
+**リクエスト**
+```json
+{
+  "content": "string",
+  "title": "string",
+  "tags": ["string"]
+}
+```
+
+### DELETE /api/documents/{filename}
+ドキュメント削除
+
+## タグAPI
+
+### GET /api/tags
+タグ一覧取得
+
+**レスポンス**
+```json
+{
+  "tags": [
+    {
+      "id": "number",
+      "name": "string"
+    }
+  ]
+}
+```
+
+### GET /api/tags/{name}/documents
+タグに関連付けられたドキュメント一覧取得
+
+**レスポンス**
+```json
+{
+  "documents": [
+    {
+      "id": "number",
+      "filename": "string",
+      "title": "string",
+      "created_at": "string",
+      "updated_at": "string",
+      "tags": ["string"]
+    }
+  ]
+}
+```
+
+## Git操作API
+
+### GET /api/git/history/{filename}
+ドキュメントの変更履歴取得
+
+**レスポンス**
+```json
+{
+  "history": [
+    {
+      "commit_id": "string",
+      "author": "string",
+      "date": "string",
+      "message": "string"
+    }
+  ]
+}
+```
+
+### GET /api/git/version/{filename}/{commit_id}
+特定バージョンのドキュメント取得
+
+**レスポンス**
+```json
+{
+  "content": "string",
+  "commit": {
+    "id": "string",
+    "author": "string",
+    "date": "string",
+    "message": "string"
+  }
+}
+```
