@@ -53,6 +53,12 @@ body {
   background-color: var(--secondary-color);
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .app-content {
   flex: 1;
   padding: 2rem;
@@ -277,5 +283,119 @@ body {
   align-items: center;
   height: 200px;
   font-style: italic;
+  color: #666;
+}
+
+/* Search Components */
+.search-bar {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.search-bar input {
+  padding: 0.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  min-width: 200px;
+}
+
+.search-bar button {
+  background-color: white;
+  color: var(--primary-color);
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.search-bar button:hover {
+  background-color: #f0f0f0;
+}
+
+.search-bar button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  color: #666;
+}
+
+.search-results {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.search-results h2 {
+  color: var(--primary-color);
+  margin-bottom: 1.5rem;
+}
+
+.search-summary {
+  margin-bottom: 1.5rem;
+  color: #666;
+  font-style: italic;
+}
+
+.search-results-list {
+  list-style: none;
+}
+
+.search-result-item {
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item h3 {
+  margin-bottom: 0.5rem;
+}
+
+.search-result-item h3 a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.search-result-item h3 a:hover {
+  text-decoration: underline;
+}
+
+.search-preview {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.search-preview mark {
+  background-color: rgba(255, 230, 0, 0.4);
+  padding: 0.1rem 0.2rem;
+  border-radius: 2px;
+}
+
+.search-meta {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.search-meta .edit-link {
+  margin-left: 0.5rem;
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.search-meta .edit-link:hover {
+  text-decoration: underline;
+}
+
+.search-results-empty {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  text-align: center;
   color: #666;
 } 
