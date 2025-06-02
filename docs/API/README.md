@@ -175,6 +175,148 @@ GET /api/wiki/search?q=検索クエリ
 }
 ```
 
+### メタデータの取得と更新
+
+```
+GET /api/wiki/:filename/metadata
+POST /api/wiki/:filename/metadata
+```
+
+ドキュメントのメタデータ（タグ、タイトル、閲覧回数など）を取得・更新します。
+
+#### リクエスト (POSTのみ)
+
+```json
+{
+  "title": "ドキュメントのタイトル",
+  "tags": ["タグ1", "タグ2", "タグ3"]
+}
+```
+
+#### レスポンス (GET)
+
+**成功時 (200 OK)**
+
+```json
+{
+  "id": 1,
+  "filename": "welcome",
+  "title": "ウェルカムページ",
+  "created_at": 1633046400,
+  "updated_at": 1633132800,
+  "view_count": 42,
+  "tags": ["タグ1", "タグ2", "タグ3"]
+}
+```
+
+**エラー時 (404 Not Found)**
+
+```json
+{
+  "error": "Metadata for document welcome not found"
+}
+```
+
+### すべてのタグを取得
+
+```
+GET /api/tags
+```
+
+システム内のすべてのタグを取得します。
+
+#### レスポンス
+
+**成功時 (200 OK)**
+
+```json
+{
+  "tags": ["タグ1", "タグ2", "タグ3", "タグ4"]
+}
+```
+
+### タグによるドキュメント検索
+
+```
+GET /api/tags/search?tag=タグ名
+```
+
+特定のタグが付いたドキュメントを検索します。
+
+#### パラメータ
+
+- `tag`: 検索するタグ名
+
+#### レスポンス
+
+**成功時 (200 OK)**
+
+```json
+{
+  "documents": [
+    {
+      "id": 1,
+      "filename": "welcome",
+      "title": "ウェルカムページ",
+      "created_at": 1633046400,
+      "updated_at": 1633132800,
+      "view_count": 42,
+      "tags": ["タグ1", "タグ2"]
+    },
+    {
+      "id": 2,
+      "filename": "about",
+      "title": "このサイトについて",
+      "created_at": 1633046500,
+      "updated_at": 1633132900,
+      "view_count": 28,
+      "tags": ["タグ1", "タグ3"]
+    }
+  ]
+}
+```
+
+**エラー時 (400 Bad Request)**
+
+```json
+{
+  "error": "Tag parameter is required"
+}
+```
+
+### 最近更新されたドキュメント
+
+```
+GET /api/recent?limit=5
+```
+
+最近更新されたドキュメントのリストを取得します。
+
+#### パラメータ
+
+- `limit`: 取得するドキュメント数（デフォルト: 10）
+
+#### レスポンス
+
+**成功時 (200 OK)**
+
+```json
+{
+  "documents": [
+    {
+      "id": 1,
+      "filename": "welcome",
+      "title": "ウェルカムページ",
+      "created_at": 1633046400,
+      "updated_at": 1633132800,
+      "view_count": 42,
+      "tags": ["タグ1", "タグ2"]
+    },
+    // 他のドキュメント...
+  ]
+}
+```
+
 ## 今後実装予定のエンドポイント
 
 ### ドキュメント履歴の取得

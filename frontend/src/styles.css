@@ -506,4 +506,210 @@ body {
 .viewer-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+/* Metadata Editor */
+.metadata-editor {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.metadata-editor-header {
+  margin-bottom: 1.5rem;
+}
+
+.metadata-editor-header h2 {
+  color: var(--primary-color);
+}
+
+.metadata-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+}
+
+.form-group input {
+  padding: 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.tag-input-container {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tag-input-container input {
+  flex: 1;
+}
+
+.add-tag-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0 1rem;
+  cursor: pointer;
+}
+
+.current-tags, .available-tags {
+  margin-top: 1rem;
+}
+
+.current-tags h4, .available-tags h4 {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tag {
+  background-color: #f0f0f0;
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tag-selected {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.tag-selectable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.tag-selectable:hover {
+  background-color: #e0e0e0;
+}
+
+.remove-tag-btn {
+  background: none;
+  border: none;
+  margin-left: 0.3rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.remove-tag-btn:hover {
+  color: var(--error-color);
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.cancel-btn {
+  background-color: #f0f0f0;
+  color: #666;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
+}
+
+.cancel-btn:hover {
+  background-color: #e0e0e0;
+}
+
+/* Tag Manager */
+.tag-manager {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.tag-manager-header {
+  margin-bottom: 1.5rem;
+}
+
+.tag-manager-header h2 {
+  color: var(--primary-color);
+}
+
+.tag-manager-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.tag-list h3, .tagged-documents h3 {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+.document-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.document-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.document-tags {
+  margin-top: 0.5rem;
+}
+
+/* Recent Documents */
+.recent-documents {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.recent-documents-header {
+  margin-bottom: 1.5rem;
+}
+
+.recent-documents-header h2 {
+  color: var(--primary-color);
+}
+
+.metadata-btn {
+  background-color: #6d4a7d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background-color 0.3s;
+}
+
+.metadata-btn:hover {
+  background-color: #8a5c9e;
 } 

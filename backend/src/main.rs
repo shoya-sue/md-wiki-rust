@@ -10,10 +10,14 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod handlers;
 mod routes;
 mod git_ops;
+mod db;
+
+use db::DbManager;
 
 #[derive(Clone)]
 pub struct AppState {
     pub markdown_dir: PathBuf,
+    pub db_manager: Option<DbManager>,
 }
 
 #[tokio::main]
@@ -32,9 +36,23 @@ async fn main() {
         fs::create_dir_all(&markdown_dir).expect("Failed to create markdown directory");
     }
     
+    // SQLiteデータベースの初期化
+    let db_path = PathBuf::from("../storage/md_wiki.db");
+    let db_manager = match DbManager::new(&db_path) {
+        Ok(manager) => {
+            tracing::info!("Database initialized successfully");
+            Some(manager)
+        },
+        Err(e) => {
+            tracing::error!("Failed to initialize database: {}", e);
+            None
+        }
+    };
+    
     // Set up application state
     let app_state = AppState {
         markdown_dir,
+        db_manager,
     };
     
     // Configure CORS
@@ -52,6 +70,12 @@ async fn main() {
         .route("/api/wiki/search", get(handlers::search_documents))
         .route("/api/wiki/:filename/history", get(handlers::get_document_history))
         .route("/api/wiki/:filename/version/:commit_id", get(handlers::get_document_version))
+        // メタデータ関連のエンドポイント
+        .route("/api/wiki/:filename/metadata", get(handlers::get_document_metadata))
+        .route("/api/wiki/:filename/metadata", post(handlers::update_document_metadata))
+        .route("/api/tags", get(handlers::get_all_tags))
+        .route("/api/tags/search", get(handlers::search_documents_by_tag))
+        .route("/api/recent", get(handlers::get_recent_documents))
         .layer(cors)
         .with_state(app_state);
     

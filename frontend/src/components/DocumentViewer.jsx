@@ -60,6 +60,7 @@ function DocumentViewer() {
         <div className="viewer-actions">
           <Link to={`/edit/${filename}`} className="edit-btn">Edit</Link>
           <Link to={`/history/${filename}`} className="history-btn">History</Link>
+          <Link to={`/metadata/${filename}`} className="metadata-btn">Metadata</Link>
         </div>
       </div>
       
