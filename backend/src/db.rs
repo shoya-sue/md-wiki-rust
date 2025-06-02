@@ -1,6 +1,7 @@
 use rusqlite::{Connection, Result as SqlResult, params};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use crate::models::{User, UserRole, hash_password, verify_password};
 
 /// ドキュメントのメタデータを表す構造体
 #[derive(Debug, Clone)]
@@ -33,9 +34,27 @@ impl DbManager {
         })
     }
     
+    /// ユーザーテーブルの初期化
+    fn init_user_tables(conn: &Connection) -> SqlResult<()> {
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                role TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                last_login INTEGER
+            )",
+            [],
+        )?;
+        
+        Ok(())
+    }
+    
     /// データベーススキーマを初期化
     fn init_db(conn: &Connection) -> SqlResult<()> {
-        // documents テーブル作成
+        // 既存のテーブル初期化
         conn.execute(
             "CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY,
@@ -48,7 +67,6 @@ impl DbManager {
             [],
         )?;
         
-        // tags テーブル作成
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tags (
                 id INTEGER PRIMARY KEY,
@@ -57,7 +75,6 @@ impl DbManager {
             [],
         )?;
         
-        // document_tags (多対多関連) テーブル作成
         conn.execute(
             "CREATE TABLE IF NOT EXISTS document_tags (
                 document_id INTEGER NOT NULL,
@@ -68,6 +85,36 @@ impl DbManager {
             )",
             [],
         )?;
+        
+        // ユーザーテーブルの初期化
+        Self::init_user_tables(conn)?;
+        
+        // 管理者ユーザーが存在しない場合は作成（初期設定）
+        let mut stmt = conn.prepare("SELECT COUNT(*) FROM users WHERE role = 'admin'")?;
+        let admin_count: i64 = stmt.query_row([], |row| row.get(0))?;
+        
+        if admin_count == 0 {
+            // デフォルトの管理者ユーザーを作成
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64;
+            
+            let password_hash = hash_password("admin123").map_err(|e| {
+                rusqlite::Error::UserFunctionError(Box::new(e))
+            })?;
+            
+            conn.execute(
+                "INSERT INTO users (username, password_hash, email, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                params![
+                    "admin",
+                    password_hash,
+                    "admin@example.com",
+                    "admin",
+                    now
+                ],
+            )?;
+        }
         
         Ok(())
     }
@@ -316,5 +363,274 @@ impl DbManager {
         }
         
         Ok(documents)
+    }
+    
+    // ユーザーをIDで取得
+    pub fn get_user_by_id(&self, id: i64) -> SqlResult<Option<User>> {
+        let conn = self.conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, username, password_hash, email, role, created_at, last_login FROM users WHERE id = ?"
+        )?;
+        
+        let user = stmt.query_row(params![id], |row| {
+            Ok(User {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                password_hash: row.get(2)?,
+                email: row.get(3)?,
+                role: UserRole::from_str(&row.get::<_, String>(4)?),
+                created_at: row.get(5)?,
+                last_login: row.get(6)?,
+            })
+        }).optional()?;
+        
+        Ok(user)
+    }
+    
+    // ユーザー名でユーザーを取得
+    pub fn get_user_by_username(&self, username: &str) -> SqlResult<Option<User>> {
+        let conn = self.conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, username, password_hash, email, role, created_at, last_login FROM users WHERE username = ?"
+        )?;
+        
+        let user = stmt.query_row(params![username], |row| {
+            Ok(User {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                password_hash: row.get(2)?,
+                email: row.get(3)?,
+                role: UserRole::from_str(&row.get::<_, String>(4)?),
+                created_at: row.get(5)?,
+                last_login: row.get(6)?,
+            })
+        }).optional()?;
+        
+        Ok(user)
+    }
+    
+    // ユーザーを作成
+    pub fn create_user(&self, username: &str, password: &str, email: &str, role: &str) -> SqlResult<i64> {
+        let conn = self.conn.lock().unwrap();
+        
+        // ユーザー名またはメールアドレスが既に使用されているかチェック
+        let mut stmt = conn.prepare("SELECT COUNT(*) FROM users WHERE username = ? OR email = ?")?;
+        let count: i64 = stmt.query_row(params![username, email], |row| row.get(0))?;
+        
+        if count > 0 {
+            return Err(rusqlite::Error::UserFunctionError(Box::new(
+                std::io::Error::new(std::io::ErrorKind::AlreadyExists, "Username or email already exists")
+            )));
+        }
+        
+        // パスワードをハッシュ化
+        let password_hash = match hash_password(password) {
+            Ok(hash) => hash,
+            Err(e) => return Err(rusqlite::Error::UserFunctionError(Box::new(e))),
+        };
+        
+        // 現在のUNIXタイムスタンプを取得
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        
+        // ユーザーを作成
+        conn.execute(
+            "INSERT INTO users (username, password_hash, email, role, created_at) VALUES (?, ?, ?, ?, ?)",
+            params![username, password_hash, email, role, now],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+    
+    // ユーザーを認証
+    pub fn authenticate_user(&self, username: &str, password: &str) -> SqlResult<Option<User>> {
+        let user = self.get_user_by_username(username)?;
+        
+        if let Some(user) = user {
+            match verify_password(&user.password_hash, password) {
+                Ok(is_valid) => {
+                    if is_valid {
+                        // 最終ログイン時間を更新
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs() as i64;
+                        
+                        let conn = self.conn.lock().unwrap();
+                        conn.execute(
+                            "UPDATE users SET last_login = ? WHERE id = ?",
+                            params![now, user.id],
+                        )?;
+                        
+                        let mut updated_user = user;
+                        updated_user.last_login = Some(now);
+                        
+                        return Ok(Some(updated_user));
+                    }
+                },
+                Err(_) => return Ok(None),
+            }
+        }
+        
+        Ok(None)
+    }
+    
+    // ユーザーのパスワードを変更
+    pub fn change_password(&self, user_id: i64, current_password: &str, new_password: &str) -> SqlResult<bool> {
+        let user = self.get_user_by_id(user_id)?;
+        
+        if let Some(user) = user {
+            match verify_password(&user.password_hash, current_password) {
+                Ok(is_valid) => {
+                    if is_valid {
+                        // 新しいパスワードをハッシュ化
+                        let new_password_hash = match hash_password(new_password) {
+                            Ok(hash) => hash,
+                            Err(e) => return Err(rusqlite::Error::UserFunctionError(Box::new(e))),
+                        };
+                        
+                        // パスワードを更新
+                        let conn = self.conn.lock().unwrap();
+                        conn.execute(
+                            "UPDATE users SET password_hash = ? WHERE id = ?",
+                            params![new_password_hash, user_id],
+                        )?;
+                        
+                        return Ok(true);
+                    }
+                },
+                Err(_) => return Ok(false),
+            }
+        }
+        
+        Ok(false)
+    }
+    
+    // すべてのユーザーを取得
+    pub fn get_all_users(&self) -> SqlResult<Vec<User>> {
+        let conn = self.conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, username, password_hash, email, role, created_at, last_login FROM users"
+        )?;
+        
+        let user_iter = stmt.query_map([], |row| {
+            Ok(User {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                password_hash: row.get(2)?,
+                email: row.get(3)?,
+                role: UserRole::from_str(&row.get::<_, String>(4)?),
+                created_at: row.get(5)?,
+                last_login: row.get(6)?,
+            })
+        })?;
+        
+        let mut users = Vec::new();
+        for user_result in user_iter {
+            if let Ok(user) = user_result {
+                users.push(user);
+            }
+        }
+        
+        Ok(users)
+    }
+    
+    // ユーザーの情報を更新
+    pub fn update_user(&self, user_id: i64, email: Option<&str>, role: Option<&str>) -> SqlResult<bool> {
+        let conn = self.conn.lock().unwrap();
+        
+        let user = self.get_user_by_id(user_id)?;
+        if user.is_none() {
+            return Ok(false);
+        }
+        
+        let mut updates = Vec::new();
+        let mut params_values: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        
+        if let Some(email) = email {
+            updates.push("email = ?");
+            params_values.push(Box::new(email.to_string()));
+        }
+        
+        if let Some(role) = role {
+            updates.push("role = ?");
+            params_values.push(Box::new(role.to_string()));
+        }
+        
+        if updates.is_empty() {
+            return Ok(true); // 何も更新がなければ成功とみなす
+        }
+        
+        let sql = format!(
+            "UPDATE users SET {} WHERE id = ?",
+            updates.join(", ")
+        );
+        
+        let mut params: Vec<&dyn rusqlite::ToSql> = params_values.iter().map(|p| p.as_ref()).collect();
+        params.push(&user_id);
+        
+        let result = conn.execute(&sql, rusqlite::params_from_iter(params))?;
+        
+        Ok(result > 0)
+    }
+    
+    // ユーザーを削除
+    pub fn delete_user(&self, user_id: i64) -> SqlResult<bool> {
+        let conn = self.conn.lock().unwrap();
+        
+        let result = conn.execute(
+            "DELETE FROM users WHERE id = ?",
+            params![user_id],
+        )?;
+        
+        Ok(result > 0)
+    }
+    
+    /// ドキュメントのメタデータを削除
+    pub fn delete_document_metadata(&self, filename: &str) -> SqlResult<bool> {
+        let conn = self.conn.lock().unwrap();
+        
+        // トランザクション開始
+        let tx = conn.transaction()?;
+        
+        // ドキュメントのIDを取得
+        let mut stmt = tx.prepare("SELECT id FROM documents WHERE filename = ?")?;
+        let document_id: Option<i64> = stmt.query_row(params![filename], |row| {
+            Ok(row.get(0)?)
+        }).ok();
+        
+        if let Some(id) = document_id {
+            // ドキュメントとタグの関連付けを削除
+            tx.execute(
+                "DELETE FROM document_tags WHERE document_id = ?",
+                params![id],
+            )?;
+            
+            // ドキュメントを削除
+            tx.execute(
+                "DELETE FROM documents WHERE id = ?",
+                params![id],
+            )?;
+            
+            // 不要になったタグを削除（どのドキュメントにも関連付けられていないタグ）
+            tx.execute(
+                "DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM document_tags)",
+                [],
+            )?;
+            
+            // トランザクションをコミット
+            tx.commit()?;
+            
+            Ok(true)
+        } else {
+            // ドキュメントが見つからない場合は何もしない
+            tx.commit()?;
+            Ok(false)
+        }
     }
 } 

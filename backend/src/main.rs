@@ -11,6 +11,8 @@ mod handlers;
 mod routes;
 mod git_ops;
 mod db;
+mod models;
+mod auth;
 
 use db::DbManager;
 
@@ -61,23 +63,11 @@ async fn main() {
         .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers(Any);
     
-    // Build our application with routes
-    let app = Router::new()
-        .route("/api/health", get(health_check))
-        .route("/api/wiki/:filename", get(handlers::get_document))
-        .route("/api/wiki/:filename", post(handlers::save_document))
-        .route("/api/wiki", get(handlers::list_documents))
-        .route("/api/wiki/search", get(handlers::search_documents))
-        .route("/api/wiki/:filename/history", get(handlers::get_document_history))
-        .route("/api/wiki/:filename/version/:commit_id", get(handlers::get_document_version))
-        // メタデータ関連のエンドポイント
-        .route("/api/wiki/:filename/metadata", get(handlers::get_document_metadata))
-        .route("/api/wiki/:filename/metadata", post(handlers::update_document_metadata))
-        .route("/api/tags", get(handlers::get_all_tags))
-        .route("/api/tags/search", get(handlers::search_documents_by_tag))
-        .route("/api/recent", get(handlers::get_recent_documents))
-        .layer(cors)
-        .with_state(app_state);
+    // 新しいルーターを構築
+    let router = routes::create_router(app_state);
+    
+    // CORSレイヤーを追加
+    let app = router.layer(cors);
     
     // Run the server
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));

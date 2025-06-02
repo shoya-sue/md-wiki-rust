@@ -185,6 +185,41 @@ impl GitOps {
         Ok(head_commit)
     }
     
+    // ファイルを削除してコミット
+    pub fn remove_file(&self, file_path: &str, message: &str) -> Result<String, GitError> {
+        let full_path = self.repo_path.join(file_path);
+        let relative_path = full_path.strip_prefix(&self.repo_path)
+            .unwrap_or_else(|_| Path::new(file_path));
+        
+        // ファイルが存在するか確認
+        if !full_path.exists() {
+            return Err(GitError::from_str(&format!("File {} does not exist", file_path)));
+        }
+        
+        // インデックスからファイルを削除
+        let mut index = self.repo.index()?;
+        index.remove_path(relative_path)?;
+        index.write()?;
+        
+        let tree_id = index.write_tree()?;
+        let tree = self.repo.find_tree(tree_id)?;
+        
+        // コミット作成
+        let signature = self.get_signature()?;
+        let parent_commit = self.get_head_commit()?;
+        
+        let commit_id = self.repo.commit(
+            Some("HEAD"), 
+            &signature, 
+            &signature, 
+            message, 
+            &tree, 
+            &[&parent_commit]
+        )?;
+        
+        Ok(commit_id.to_string())
+    }
+    
     // リポジトリの全コミット履歴を取得
     pub fn get_repo_history(&self, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
         let mut revwalk = self.repo.revwalk()?;
