@@ -398,4 +398,112 @@ body {
   padding: 2rem;
   text-align: center;
   color: #666;
+}
+
+/* Document History */
+.document-history {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.history-header h2 {
+  color: var(--primary-color);
+}
+
+.history-list {
+  list-style: none;
+}
+
+.history-item {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s;
+}
+
+.history-item:hover {
+  background-color: #f5f5f5;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.commit-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.commit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.commit-date {
+  font-weight: 500;
+  color: #666;
+}
+
+.commit-author {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.commit-message {
+  font-size: 1rem;
+  margin: 0.5rem 0;
+}
+
+.commit-actions {
+  margin-top: 0.5rem;
+}
+
+.view-version-btn, .history-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: none;
+  display: inline-block;
+  transition: background-color 0.3s;
+}
+
+.view-version-btn:hover, .history-btn:hover {
+  background-color: var(--secondary-color);
+}
+
+/* Version Viewer */
+.version-info {
+  background-color: #f5f5f5;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+
+.version-info p {
+  margin: 0.3rem 0;
+}
+
+.version-date {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.viewer-actions {
+  display: flex;
+  gap: 0.5rem;
 } 

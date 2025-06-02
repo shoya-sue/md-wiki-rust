@@ -57,7 +57,10 @@ function DocumentViewer() {
     <div className="document-viewer">
       <div className="viewer-header">
         <h2>{filename}</h2>
-        <button onClick={handleEditDocument} className="edit-btn">Edit</button>
+        <div className="viewer-actions">
+          <Link to={`/edit/${filename}`} className="edit-btn">Edit</Link>
+          <Link to={`/history/${filename}`} className="history-btn">History</Link>
+        </div>
       </div>
       
       <div className="markdown-content">

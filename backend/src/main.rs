@@ -50,6 +50,8 @@ async fn main() {
         .route("/api/wiki/:filename", post(handlers::save_document))
         .route("/api/wiki", get(handlers::list_documents))
         .route("/api/wiki/search", get(handlers::search_documents))
+        .route("/api/wiki/:filename/history", get(handlers::get_document_history))
+        .route("/api/wiki/:filename/version/:commit_id", get(handlers::get_document_version))
         .layer(cors)
         .with_state(app_state);
     

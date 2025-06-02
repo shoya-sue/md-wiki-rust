@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 
 use crate::AppState;
+use crate::git_ops::{GitOps, CommitInfo};
 
 #[derive(Serialize, Deserialize)]
 pub struct Document {
@@ -36,6 +37,19 @@ pub struct SearchResults {
     results: Vec<SearchResult>,
     query: String,
     total_matches: usize,
+}
+
+#[derive(Serialize)]
+pub struct DocumentHistory {
+    filename: String,
+    commits: Vec<CommitInfo>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DocumentVersion {
+    filename: String,
+    content: String,
+    commit_info: CommitInfo,
 }
 
 // Get a specific markdown document
@@ -68,7 +82,31 @@ pub async fn save_document(
     let file_path = state.markdown_dir.join(format!("{}.md", filename));
     
     match fs::write(&file_path, &document.content) {
-        Ok(_) => Ok(StatusCode::OK),
+        Ok(_) => {
+            // Gitコミットを作成
+            let git_ops = match GitOps::new(&state.markdown_dir) {
+                Ok(ops) => ops,
+                Err(e) => {
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({
+                            "error": format!("Failed to initialize Git operations: {}", e)
+                        })),
+                    ));
+                }
+            };
+            
+            let commit_message = format!("Update {}.md", filename);
+            match git_ops.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
+                Ok(_) => Ok(StatusCode::OK),
+                Err(e) => Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to commit document: {}", e)
+                    })),
+                )),
+            }
+        },
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
@@ -179,4 +217,97 @@ pub async fn search_documents(
         query: search_term,
         total_matches,
     }))
+}
+
+// ドキュメントの変更履歴を取得
+pub async fn get_document_history(
+    State(state): State<AppState>,
+    Path(filename): Path<String>,
+) -> Result<Json<DocumentHistory>, (StatusCode, Json<serde_json::Value>)> {
+    let file_path = format!("{}.md", filename);
+    
+    let git_ops = match GitOps::new(&state.markdown_dir) {
+        Ok(ops) => ops,
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": format!("Failed to initialize Git operations: {}", e)
+                })),
+            ));
+        }
+    };
+    
+    match git_ops.get_file_history(&file_path) {
+        Ok(commits) => Ok(Json(DocumentHistory {
+            filename,
+            commits,
+        })),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": format!("Failed to get document history: {}", e)
+            })),
+        )),
+    }
+}
+
+// 特定バージョンのドキュメントを取得
+pub async fn get_document_version(
+    State(state): State<AppState>,
+    Path((filename, commit_id)): Path<(String, String)>,
+) -> Result<Json<DocumentVersion>, (StatusCode, Json<serde_json::Value>)> {
+    let file_path = format!("{}.md", filename);
+    
+    let git_ops = match GitOps::new(&state.markdown_dir) {
+        Ok(ops) => ops,
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": format!("Failed to initialize Git operations: {}", e)
+                })),
+            ));
+        }
+    };
+    
+    // 履歴から特定のコミット情報を取得
+    let history = match git_ops.get_file_history(&file_path) {
+        Ok(commits) => commits,
+        Err(e) => {
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": format!("Failed to get document history: {}", e)
+                })),
+            ));
+        }
+    };
+    
+    let commit_info = match history.iter().find(|commit| commit.id.starts_with(&commit_id)) {
+        Some(commit) => commit.clone(),
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": format!("Commit {} not found for document {}", commit_id, filename)
+                })),
+            ));
+        }
+    };
+    
+    // 特定バージョンの内容を取得
+    match git_ops.get_file_at_commit(&file_path, &commit_info.id) {
+        Ok(content) => Ok(Json(DocumentVersion {
+            filename,
+            content,
+            commit_info,
+        })),
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": format!("Failed to get document at commit {}: {}", commit_id, e)
+            })),
+        )),
+    }
 } 

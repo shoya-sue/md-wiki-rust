@@ -185,6 +185,46 @@ GET /api/wiki/:filename/history
 
 特定のドキュメントの変更履歴を取得します。
 
+#### パラメータ
+
+- `filename`: 履歴を取得するドキュメントのファイル名（拡張子なし）
+
+#### レスポンス
+
+**成功時 (200 OK)**
+
+```json
+{
+  "filename": "welcome",
+  "commits": [
+    {
+      "id": "8a7d6e5f4c3b2a1098765432100abcdef1234567",
+      "message": "Update welcome.md",
+      "author": "MD Wiki User",
+      "email": "user@example.com",
+      "time": 1633046400,
+      "timestamp": "2021-10-01 12:00:00"
+    },
+    {
+      "id": "1234567890abcdef1234567890abcdef12345678",
+      "message": "Initial commit",
+      "author": "MD Wiki User",
+      "email": "user@example.com",
+      "time": 1632960000,
+      "timestamp": "2021-09-30 12:00:00"
+    }
+  ]
+}
+```
+
+**エラー時 (500 Internal Server Error)**
+
+```json
+{
+  "error": "Failed to get document history: [エラーメッセージ]"
+}
+```
+
 ### 特定バージョンのドキュメント取得
 
 ```
@@ -193,11 +233,46 @@ GET /api/wiki/:filename/version/:commit_id
 
 特定のバージョン（コミットID）のドキュメントを取得します。
 
+#### パラメータ
+
+- `filename`: 取得するドキュメントのファイル名（拡張子なし）
+- `commit_id`: 取得するコミットのID（省略可能な接頭辞）
+
+#### レスポンス
+
+**成功時 (200 OK)**
+
+```json
+{
+  "filename": "welcome",
+  "content": "# Welcome\n\nThis is an old version of the document.",
+  "commit_info": {
+    "id": "8a7d6e5f4c3b2a1098765432100abcdef1234567",
+    "message": "Update welcome.md",
+    "author": "MD Wiki User",
+    "email": "user@example.com",
+    "time": 1633046400,
+    "timestamp": "2021-10-01 12:00:00"
+  }
+}
+```
+
+**エラー時 (404 Not Found)**
+
+```json
+{
+  "error": "Commit 8a7d6e5 not found for document welcome"
+}
+```
+
+**エラー時 (500 Internal Server Error)**
+
+```json
+{
+  "error": "Failed to get document at commit 8a7d6e5: [エラーメッセージ]"
+}
+```
+
 ### メタデータの取得と更新
 
 ```
-GET /api/wiki/:filename/metadata
-POST /api/wiki/:filename/metadata
-```
-
-ドキュメントのメタデータ（タグ、作成日時など）を取得・更新します。 
