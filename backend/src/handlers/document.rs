@@ -3,11 +3,8 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use pulldown_cmark::{Parser, Options, html};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
-use std::io;
 
 use crate::AppState;
 

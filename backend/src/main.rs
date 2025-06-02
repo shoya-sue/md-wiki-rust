@@ -1,11 +1,8 @@
 use axum::{
     routing::{get, post},
     Router, Json,
-    http::{StatusCode, HeaderMap, Method},
-    extract::{State, Path},
+    http::{StatusCode, Method},
 };
-use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::{net::SocketAddr, fs, path::PathBuf};
 use tower_http::cors::{CorsLayer, Any};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -14,8 +11,8 @@ mod handlers;
 mod routes;
 
 #[derive(Clone)]
-struct AppState {
-    markdown_dir: PathBuf,
+pub struct AppState {
+    pub markdown_dir: PathBuf,
 }
 
 #[tokio::main]
