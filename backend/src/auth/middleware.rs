@@ -1,63 +1,62 @@
 use axum::{
+    body::Body,
     extract::State,
+    http::{Request, StatusCode},
     middleware::Next,
     response::Response,
-    http::{Request, StatusCode},
-    response::IntoResponse,
 };
 use crate::{
+    error::AppError,
+    models::Role,
     AppState,
-    AppError,
-    auth::jwt::{self, Claims},
-    models::user::UserRole,
 };
 
 // 認証ミドルウェア
-pub async fn require_auth<B>(
-    State(state): State<AppState>,
-    mut request: Request<B>,
-    next: Next<B>,
+pub async fn require_auth<S>(
+    State(state): State<S>,
+    mut req: Request<Body>,
+    next: Next,
 ) -> Result<Response, AppError> {
-    let auth_header = request
+    let auth_header = req
         .headers()
         .get("Authorization")
         .and_then(|header| header.to_str().ok())
-        .ok_or_else(|| AppError::Authentication("No authorization header".into()))?;
+        .ok_or_else(|| AppError::Auth("Missing authorization header".into()))?;
 
     if !auth_header.starts_with("Bearer ") {
-        return Err(AppError::Authentication("Invalid authorization header".into()));
+        return Err(AppError::Auth("Invalid authorization header".into()));
     }
 
     let token = &auth_header["Bearer ".len()..];
-    let claims = jwt::verify_token(token)
-        .map_err(|e| AppError::Authentication(e.to_string()))?;
+    let claims = crate::auth::jwt::verify_token(token)
+        .map_err(|_| AppError::Auth("Invalid token".into()))?;
 
-    request.extensions_mut().insert(claims);
-    Ok(next.run(request).await)
+    req.extensions_mut().insert(claims);
+    Ok(next.run(req).await)
 }
 
-pub async fn require_role<B>(
-    required_role: UserRole,
-    mut request: Request<B>,
-    next: Next<B>,
+pub async fn require_role<S>(
+    State(state): State<S>,
+    mut req: Request<Body>,
+    next: Next,
+    required_role: Role,
 ) -> Result<Response, AppError> {
-    let claims = request
+    let claims = req
         .extensions()
-        .get::<Claims>()
-        .ok_or_else(|| AppError::Authorization("No claims found".into()))?;
+        .get::<crate::auth::jwt::Claims>()
+        .ok_or_else(|| AppError::Auth("Missing authentication".into()))?;
 
-    let user_role = UserRole::from_str(&claims.role);
-    if !user_role.has_permission(&required_role) {
-        return Err(AppError::Authorization("Insufficient permissions".into()));
+    if claims.role >= required_role {
+        Ok(next.run(req).await)
+    } else {
+        Err(AppError::Auth("Insufficient permissions".into()))
     }
-
-    Ok(next.run(request).await)
 }
 
-pub fn auth_layer<B>() -> axum::middleware::from_fn::FromFn<impl Fn(Request<B>, Next<B>) -> impl std::future::Future<Output = Response> + Clone> {
-    axum::middleware::from_fn(require_auth)
+pub fn auth_middleware<S>(state: S) -> axum::middleware::from_fn::FromFn<S, require_auth<S>> {
+    axum::middleware::from_fn_with_state(state, require_auth)
 }
 
-pub fn role_layer<B>(role: UserRole) -> axum::middleware::from_fn::FromFn<impl Fn(Request<B>, Next<B>) -> impl std::future::Future<Output = Response> + Clone> {
-    axum::middleware::from_fn(move |req, next| require_role(role, req, next))
+pub fn role_middleware<S>(state: S, role: Role) -> axum::middleware::from_fn::FromFn<S, require_role<S>> {
+    axum::middleware::from_fn_with_state(state, move |state, req, next| require_role(state, req, next, role))
 } 

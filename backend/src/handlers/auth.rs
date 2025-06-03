@@ -35,9 +35,10 @@ pub async fn register_user(
         &registration.password,
         &registration.email,
         role,
-    ) {
+    ).await {
         Ok(_) => Ok(StatusCode::CREATED),
         Err(e) => {
+            eprintln!("Registration error: {}", e);
             if e.to_string().contains("already exists") {
                 return Err((
                     StatusCode::CONFLICT,
@@ -75,7 +76,7 @@ pub async fn login(
     };
     
     // ユーザー認証
-    match db.authenticate_user(&credentials.username, &credentials.password) {
+    match db.authenticate_user(&credentials.username, &credentials.password).await {
         Ok(Some(user)) => {
             // JWTトークン生成
             match jwt::generate_token(&user) {
@@ -95,12 +96,15 @@ pub async fn login(
                         "user": user_without_hash
                     })))
                 },
-                Err(e) => Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": format!("Failed to generate token: {}", e)
-                    })),
-                )),
+                Err(e) => {
+                    eprintln!("Token creation error: {}", e);
+                    Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({
+                            "error": format!("Failed to generate token: {}", e)
+                        })),
+                    ))
+                }
             }
         },
         Ok(None) => Err((
@@ -109,12 +113,15 @@ pub async fn login(
                 "error": "Invalid username or password"
             })),
         )),
-        Err(e) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({
-                "error": format!("Authentication error: {}", e)
-            })),
-        )),
+        Err(e) => {
+            eprintln!("Authentication error: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": format!("Authentication error: {}", e)
+                })),
+            ))
+        }
     }
 }
 
@@ -137,7 +144,7 @@ pub async fn change_password(
     };
     
     // パスワード変更
-    match db.change_password(user_id, &request.current_password, &request.new_password) {
+    match db.change_password(user_id, &request.current_password, &request.new_password).await {
         Ok(true) => Ok(StatusCode::OK),
         Ok(false) => Err((
             StatusCode::UNAUTHORIZED,
@@ -171,7 +178,7 @@ pub async fn get_all_users(
     };
     
     // すべてのユーザーを取得
-    match db.get_all_users() {
+    match db.get_all_users().await {
         Ok(users) => {
             // パスワードハッシュを除外
             let users_without_hash: Vec<User> = users.into_iter().map(|user| {
@@ -215,7 +222,7 @@ pub async fn get_user(
     };
     
     // ユーザーを取得
-    match db.get_user_by_id(user_id) {
+    match db.get_user_by_id(user_id).await {
         Ok(Some(user)) => {
             // パスワードハッシュを除外
             let user_without_hash = User {

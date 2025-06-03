@@ -1,84 +1,49 @@
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation, errors::Error as JwtError};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use crate::{error::AppError, models::Role};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::models::User;
 
-// JWTクレーム
-#[derive(Debug, Serialize, Deserialize, Clone)]
+const JWT_SECRET: &[u8] = b"your-secret-key";  // 本番環境では環境変数から取得すべき
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    // サブジェクト（ユーザーID）
-    pub sub: String,
-    // ユーザー名
+    pub sub: i64,  // user_id
     pub username: String,
-    // ユーザーロール
-    pub role: String,
-    // 発行時間
-    pub iat: u64,
-    // 有効期限
-    pub exp: u64,
+    pub role: Role,
+    pub exp: i64,  // expiration time
 }
 
 impl Claims {
-    pub fn new(username: &str, role: &str, expiration: usize) -> Self {
-        Claims {
-            sub: username.to_string(),
-            username: username.to_string(),
-            role: role.to_string(),
-            iat: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs(),
-            exp: (SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs() + expiration as u64),
+    pub fn new(user_id: i64, username: String, role: Role) -> Self {
+        let exp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64 + 24 * 60 * 60; // 24時間後に期限切れ
+
+        Self {
+            sub: user_id,
+            username,
+            role,
+            exp,
         }
     }
 }
 
-// JWTの秘密鍵
-const JWT_SECRET: &[u8] = b"md_wiki_secret_key"; // 本番環境では環境変数などから取得するべき
-
-// トークンの有効期限（24時間）
-const TOKEN_EXPIRATION: u64 = 60 * 60 * 24;
-
-// ユーザー情報からJWTトークンを生成
-pub fn generate_token(user: &User) -> Result<String, JwtError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs();
-    
-    let claims = Claims {
-        sub: user.id.to_string(),
-        username: user.username.clone(),
-        role: user.role.to_string(),
-        iat: now,
-        exp: now + TOKEN_EXPIRATION,
-    };
-    
+pub fn create_token(claims: &Claims) -> Result<String, AppError> {
     encode(
         &Header::default(),
-        &claims,
+        claims,
         &EncodingKey::from_secret(JWT_SECRET),
     )
+    .map_err(|e| AppError::Auth(format!("Failed to create token: {}", e)))
 }
 
-// JWTトークンを検証して、クレームを取得
-pub fn verify_token(token: &str) -> Result<Claims, JwtError> {
-    let token_data = decode::<Claims>(
+pub fn verify_token(token: &str) -> Result<Claims, AppError> {
+    decode::<Claims>(
         token,
         &DecodingKey::from_secret(JWT_SECRET),
         &Validation::default(),
-    )?;
-    
-    Ok(token_data.claims)
-}
-
-// 現在のUnixタイムスタンプを取得
-pub fn current_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs()
+    )
+    .map(|data| data.claims)
+    .map_err(|e| AppError::Auth(format!("Invalid token: {}", e)))
 } 
