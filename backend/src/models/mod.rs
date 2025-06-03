@@ -1,2 +1,6 @@
 pub use self::user::*;
-mod user; 
+pub mod user;
+pub mod document;
+
+pub use document::Document;
+pub use user::{User, Role, UserRole}; 
