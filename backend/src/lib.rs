@@ -1,12 +1,22 @@
 use std::fmt;
+use std::path::PathBuf;
 use thiserror::Error;
+use serde::{Deserialize, Serialize};
 
 pub mod auth;
 pub mod db;
+pub mod error;
 pub mod git_ops;
 pub mod handlers;
 pub mod models;
 pub mod routes;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub markdown_dir: PathBuf,
+    pub db_manager: Option<db::DbManager>,
+    pub git_repo: Option<git_ops::GitRepository>,
+}
 
 #[derive(Debug, Error)]
 pub enum AppError {
@@ -72,4 +82,4 @@ impl axum::response::IntoResponse for AppError {
     }
 }
 
-pub type AppResult<T> = Result<T, AppError>; 
+pub type AppResult<T> = Result<T, error::AppError>; 

@@ -1,26 +1,17 @@
+use std::net::SocketAddr;
 use axum::{
     routing::{get, post},
-    Router, Json,
-    http::{StatusCode, Method},
+    Router,
 };
-use std::{net::SocketAddr, fs, path::PathBuf};
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod handlers;
-mod routes;
-mod git_ops;
+mod api;
+mod config;
 mod db;
+mod error;
 mod models;
-mod auth;
-
-use db::DbManager;
-
-#[derive(Clone)]
-pub struct AppState {
-    pub markdown_dir: PathBuf,
-    pub db_manager: Option<DbManager>,
-}
+mod utils;
 
 #[tokio::main]
 async fn main() {
@@ -31,57 +22,34 @@ async fn main() {
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
-    
-    // Set up markdown directory
-    let markdown_dir = PathBuf::from("../storage/markdown_files");
-    if !markdown_dir.exists() {
-        fs::create_dir_all(&markdown_dir).expect("Failed to create markdown directory");
-    }
-    
-    // SQLiteデータベースの初期化
-    let db_path = PathBuf::from("../storage/md_wiki.db");
-    let db_manager = match DbManager::new(&db_path) {
-        Ok(manager) => {
-            tracing::info!("Database initialized successfully");
-            Some(manager)
-        },
-        Err(e) => {
-            tracing::error!("Failed to initialize database: {}", e);
-            None
-        }
-    };
-    
-    // Set up application state
-    let app_state = AppState {
-        markdown_dir,
-        db_manager,
-    };
-    
-    // Configure CORS
+
+    // Load environment variables
+    dotenv::dotenv().ok();
+
+    // Initialize database
+    let db = db::init_db().await.expect("Failed to initialize database");
+
+    // Build application
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+        .allow_methods(Any)
         .allow_headers(Any);
-    
-    // 新しいルーターを構築
-    let router = routes::create_router(app_state);
-    
-    // CORSレイヤーを追加
-    let app = router.layer(cors);
-    
-    // Run the server
+
+    let app = Router::new()
+        .route("/health", get(health_check))
+        .with_state(db)
+        .layer(cors);
+
+    // Start server
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    tracing::info!("Server listening on {}", addr);
+    tracing::info!("listening on {}", addr);
+    
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
 }
 
-// Simple health check endpoint
-async fn health_check() -> (StatusCode, Json<serde_json::Value>) {
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({ "status": "ok" })),
-    )
+async fn health_check() -> &'static str {
+    "OK"
 } 

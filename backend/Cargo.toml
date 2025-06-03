@@ -3,13 +3,16 @@ name = "md-wiki-rust-backend"
 version = "0.1.0"
 edition = "2021"
 authors = [""]
-description = "Backend for Markdown Wiki built with Rust"
+description = "Backend API for Markdown Wiki built with Rust"
 
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["macros"] }
+axum = { version = "0.7", features = ["multipart"] }
 tower = { version = "0.4", features = ["util"] }
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "auth"] }
+http = "1.0"
+http-body = "1.0"
+hyper = { version = "1.0", features = ["full"] }
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
@@ -20,13 +23,14 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Database
-rusqlite = { version = "0.30", features = ["bundled"] }
+rusqlite = { version = "0.30", features = ["bundled", "chrono"] }
+tokio-rusqlite = "0.5"
 
 # Markdown
 pulldown-cmark = "0.9"
 
 # Git integration
-git2 = "0.18"
+git2 = { version = "0.18", default-features = false }
 
 # Authentication
 jsonwebtoken = "9.2"
@@ -42,4 +46,23 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Error handling
 thiserror = "1.0"
-anyhow = "1.0" 
+anyhow = "1.0"
+
+# Validation
+validator = { version = "0.16", features = ["derive"] }
+
+# Environment
+dotenv = "0.15"
+
+# Additional utilities
+async-trait = "0.1"
+bytes = "1.0"
+mime = "0.3"
+parking_lot = "0.12"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[features]
+default = []
+vendored-ssl = ["git2/vendored-openssl"] 

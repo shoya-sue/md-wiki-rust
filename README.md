@@ -39,7 +39,7 @@ Rustを用いてMarkdownファイルを共有・編集できるGUIベースのWi
 
 ## リポジトリ構造
 
-```
+```plaintext
 md-wiki-rust/
 ├── frontend
 │   ├── src
@@ -63,7 +63,7 @@ md-wiki-rust/
 │   │   └── main.rs
 │   └── Cargo.toml
 ├── storage
-│   └── markdown_files (別Gitリポジトリとして管理)
+│   └── markdown_files (ここにMarkdownファイルを保存,このRespositoryはGitで管理されます。)
 ├── docs
 │   ├── API
 │   │   └── README.md (API仕様書)
@@ -167,4 +167,3 @@ MIT License
 
 * リアルタイム共同編集機能の導入
 * 公開・非公開モードの切り替え
-

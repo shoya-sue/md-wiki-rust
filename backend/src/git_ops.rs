@@ -1,71 +1,85 @@
+use std::fmt;
 use git2::{Repository, Signature, Time, Commit, Oid, ObjectType, Error as GitError};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use serde::{Serialize, Deserialize};
-use chrono::NaiveDateTime;
-use crate::AppResult;
+use chrono::DateTime;
+use crate::error::AppError;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitInfo {
     pub id: String,
-    pub message: String,
     pub author: String,
-    pub email: String,
-    pub time: i64,
-    pub timestamp: String,
+    pub message: String,
+    pub timestamp: i64,
 }
 
-#[derive(Debug)]
+impl fmt::Debug for CommitInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CommitInfo")
+            .field("id", &self.id)
+            .field("author", &self.author)
+            .field("message", &self.message)
+            .field("timestamp", &self.timestamp)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
 pub struct GitRepository {
-    repo: Repository,
-    path: PathBuf,
+    repo: Arc<Mutex<Repository>>,
+    root_path: PathBuf,
 }
 
 impl std::fmt::Debug for GitRepository {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GitRepository")
-            .field("path", &self.path)
+            .field("root_path", &self.root_path)
             .finish()
     }
 }
 
 impl GitRepository {
-    pub fn new(path: &Path) -> Result<Self, GitError> {
-        let repo = Repository::init(path)?;
-        Ok(GitRepository {
-            repo,
-            path: path.to_path_buf(),
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, GitError> {
+        let root_path = path.as_ref().to_path_buf();
+        let repo = Repository::init(&root_path)?;
+        Ok(Self {
+            repo: Arc::new(Mutex::new(repo)),
+            root_path,
         })
     }
 
-    pub fn open(path: &Path) -> Result<Self, GitError> {
-        let repo = Repository::open(path)?;
-        Ok(GitRepository {
-            repo,
-            path: path.to_path_buf(),
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, GitError> {
+        let root_path = path.as_ref().to_path_buf();
+        let repo = Repository::open(&root_path)?;
+        Ok(Self {
+            repo: Arc::new(Mutex::new(repo)),
+            root_path,
         })
     }
 
-    pub fn commit_file(&self, filepath: &Path, message: &str) -> Result<Oid, GitError> {
-        let mut index = self.repo.index()?;
-        index.add_path(filepath)?;
+    pub fn commit_file<P: AsRef<Path>>(&self, file_path: P, message: &str, author: &str) -> Result<Oid, GitError> {
+        let path = file_path.as_ref();
+        let repo = self.repo.lock();
+        let mut index = repo.index()?;
+        
+        index.add_path(path)?;
         index.write()?;
 
         let tree_id = index.write_tree()?;
-        let tree = self.repo.find_tree(tree_id)?;
+        let tree = repo.find_tree(tree_id)?;
 
-        let signature = self.repo.signature()?;
-        let parent_commit = match self.repo.head() {
-            Ok(head) => Some(head.peel_to_commit()?),
-            Err(_) => None,
-        };
-
+        let signature = Signature::now(author, "user@example.com")?;
+        let parent_commit = repo.head().ok().and_then(|head| head.target()).and_then(|oid| repo.find_commit(oid).ok());
+        
         let parents = match parent_commit {
-            Some(commit) => vec![&commit],
+            Some(ref commit) => vec![commit],
             None => vec![],
         };
 
-        self.repo.commit(
+        repo.commit(
             Some("HEAD"),
             &signature,
             &signature,
@@ -75,81 +89,85 @@ impl GitRepository {
         )
     }
 
-    pub fn get_file_history(&self, filepath: &Path) -> Result<Vec<CommitInfo>, GitError> {
-        let mut revwalk = self.repo.revwalk()?;
+    pub fn get_file_history<P: AsRef<Path>>(&self, file_path: P) -> Result<Vec<CommitInfo>, GitError> {
+        let path = file_path.as_ref();
+        let repo = self.repo.lock();
+        let mut revwalk = repo.revwalk()?;
         revwalk.push_head()?;
-        revwalk.set_sorting(git2::Sort::TIME)?;
-
+        
         let mut history = Vec::new();
         for oid in revwalk {
-            let commit = self.repo.find_commit(oid?)?;
-            let tree = commit.tree()?;
+            let oid = oid?;
+            let commit = repo.find_commit(oid)?;
             
-            // Check if the file exists in this commit
-            if let Ok(_) = tree.get_path(filepath) {
-                let mut diff_options = git2::DiffOptions::new();
-                diff_options.pathspec(filepath);
-                
-                let parent_tree = commit.parent(0).ok().and_then(|c| c.tree().ok());
-                let diff = self.repo.diff_tree_to_tree(
-                    parent_tree.as_ref(),
-                    Some(&tree),
-                    Some(&mut diff_options),
+            if let Some(parent) = commit.parent(0).ok() {
+                let diff = repo.diff_tree_to_tree(
+                    Some(&parent.tree()?),
+                    Some(&commit.tree()?),
+                    None,
                 )?;
-                
+
                 let mut found = false;
                 diff.foreach(
-                    &mut |_delta, _| true,
-                    None,
-                    Some(&mut |_delta, _hunk| true),
-                    Some(&mut |delta, _hunk, line| {
-                        if delta.new_file().path() == Some(filepath) {
-                            found = true;
+                    &mut |delta, _| {
+                        if let Some(file) = delta.new_file().path() {
+                            if file == path {
+                                found = true;
+                                return false; // Stop iteration
+                            }
                         }
                         true
-                    }),
+                    },
+                    None,
+                    None,
+                    None,
                 )?;
-                
+
                 if found {
-                    history.push(CommitInfo::from_commit(&commit));
+                    history.push(CommitInfo {
+                        id: commit.id().to_string(),
+                        author: commit.author().name().unwrap_or("Unknown").to_string(),
+                        message: commit.message().unwrap_or("").to_string(),
+                        timestamp: commit.time().seconds(),
+                    });
                 }
             }
         }
-        
+
         Ok(history)
     }
 
-    pub fn get_file_content_at_commit(&self, filepath: &Path, commit_id: &str) -> Result<String, GitError> {
-        let obj = self.repo.revparse_single(commit_id)?;
-        let commit = obj.peel_to_commit()?;
+    pub fn get_file_content_at_commit<P: AsRef<Path>>(&self, file_path: P, commit_id: &str) -> Result<String, GitError> {
+        let path = file_path.as_ref();
+        let repo = self.repo.lock();
+        let oid = Oid::from_str(commit_id)?;
+        let commit = repo.find_commit(oid)?;
         let tree = commit.tree()?;
-        let entry = tree.get_path(filepath)?;
-        let object = entry.to_object(&self.repo)?;
-        let blob = object.as_blob().ok_or_else(|| {
-            GitError::from_str("Object is not a blob")
-        })?;
         
-        String::from_utf8(blob.content().to_vec())
-            .map_err(|_| GitError::from_str("Invalid UTF-8"))
+        if let Ok(entry) = tree.get_path(path) {
+            let blob = repo.find_blob(entry.id())?;
+            String::from_utf8(blob.content().to_vec())
+                .map_err(|_| GitError::from_str("Invalid UTF-8 content"))
+        } else {
+            Err(GitError::from_str("File not found in commit"))
+        }
     }
-}
 
-impl GitRepository {
     // ファイルの変更履歴を取得
-    pub fn get_file_history(&self, file_path: &str) -> Result<Vec<CommitInfo>, GitError> {
-        let full_path = self.path.join(file_path);
-        let relative_path = full_path.strip_prefix(&self.path)
+    pub fn get_file_changes(&self, file_path: &str) -> Result<Vec<CommitInfo>, GitError> {
+        let full_path = self.root_path.join(file_path);
+        let relative_path = full_path.strip_prefix(&self.root_path)
             .unwrap_or_else(|_| Path::new(file_path));
         
-        // リポジトリのHEADを取得
-        let mut revwalk = self.repo.revwalk()?;
+        let repo = self.repo.lock();
+        let mut revwalk = repo.revwalk()?;
         revwalk.push_head()?;
         
         let mut commits = Vec::new();
         
         for oid in revwalk {
             let oid = oid?;
-            let commit = self.repo.find_commit(oid)?;
+            let commit = repo.find_commit(oid)?;
             
             // このコミットでファイルが変更されたかチェック
             if self.file_changed_in_commit(&commit, relative_path)? {
@@ -172,7 +190,8 @@ impl GitRepository {
         let parent_tree = parent.tree()?;
         let commit_tree = commit.tree()?;
         
-        let diff = self.repo.diff_tree_to_tree(
+        let repo = self.repo.lock();
+        let diff = repo.diff_tree_to_tree(
             Some(&parent_tree),
             Some(&commit_tree),
             None,
@@ -183,7 +202,7 @@ impl GitRepository {
             &mut |_delta, _progress| { true },
             None,
             None,
-            Some(&mut |diff_file, _| {
+            Some(&mut |diff_file, _binary, _| {
                 if let Some(diff_path) = diff_file.new_file().path() {
                     if diff_path == file_path {
                         found = true;
@@ -197,44 +216,23 @@ impl GitRepository {
         Ok(found)
     }
     
-    // 特定のコミットバージョンのファイル内容を取得
-    pub fn get_file_at_commit(&self, file_path: &str, commit_id: &str) -> Result<String, GitError> {
-        let oid = Oid::from_str(commit_id)?;
-        let commit = self.repo.find_commit(oid)?;
-        let tree = commit.tree()?;
-        
-        let relative_path = Path::new(file_path);
-        let entry = tree.get_path(relative_path)?;
-        let object = entry.to_object(&self.repo)?;
-        
-        if let Some(blob) = object.as_blob() {
-            let content = String::from_utf8_lossy(blob.content());
-            Ok(content.to_string())
-        } else {
-            Err(GitError::from_str("Not a valid blob"))
-        }
-    }
-    
     // コミットオブジェクトをCommitInfo構造体に変換
     fn commit_to_info(&self, commit: &Commit) -> Result<CommitInfo, GitError> {
         let author = commit.author();
         let time = author.when();
         
-        let timestamp = format_timestamp(time.seconds());
-        
         Ok(CommitInfo {
             id: commit.id().to_string(),
             message: commit.message().unwrap_or("").to_string(),
             author: author.name().unwrap_or("Unknown").to_string(),
-            email: author.email().unwrap_or("").to_string(),
-            time: time.seconds(),
-            timestamp,
+            timestamp: time.seconds(),
         })
     }
     
     // 署名（コミット作者情報）を作成
     fn get_signature(&self) -> Result<Signature<'_>, GitError> {
-        let config = self.repo.config()?;
+        let repo = self.repo.lock();
+        let config = repo.config()?;
         
         let name = config.get_string("user.name")
             .unwrap_or_else(|_| "MD Wiki User".to_string());
@@ -252,15 +250,16 @@ impl GitRepository {
     
     // HEADコミットを取得
     fn get_head_commit(&self) -> Result<Commit, GitError> {
-        let head = self.repo.head()?;
+        let repo = self.repo.lock();
+        let head = repo.head()?;
         let head_commit = head.peel_to_commit()?;
         Ok(head_commit)
     }
     
     // ファイルを削除してコミット
     pub fn remove_file(&self, file_path: &str, message: &str) -> Result<String, GitError> {
-        let full_path = self.path.join(file_path);
-        let relative_path = full_path.strip_prefix(&self.path)
+        let full_path = self.root_path.join(file_path);
+        let relative_path = full_path.strip_prefix(&self.root_path)
             .unwrap_or_else(|_| Path::new(file_path));
         
         // ファイルが存在するか確認
@@ -268,25 +267,27 @@ impl GitRepository {
             return Err(GitError::from_str(&format!("File {} does not exist", file_path)));
         }
         
+        let repo = self.repo.lock();
+        
         // インデックスからファイルを削除
-        let mut index = self.repo.index()?;
+        let mut index = repo.index()?;
         index.remove_path(relative_path)?;
         index.write()?;
         
         let tree_id = index.write_tree()?;
-        let tree = self.repo.find_tree(tree_id)?;
+        let tree = repo.find_tree(tree_id)?;
         
         // コミット作成
         let signature = self.get_signature()?;
         let parent_commit = self.get_head_commit()?;
         
-        let commit_id = self.repo.commit(
+        let commit_id = repo.commit(
             Some("HEAD"), 
             &signature, 
             &signature, 
             message, 
             &tree, 
-            &[&parent_commit]
+            &[&parent_commit],
         )?;
         
         Ok(commit_id.to_string())
@@ -294,7 +295,8 @@ impl GitRepository {
     
     // リポジトリの全コミット履歴を取得
     pub fn get_repo_history(&self, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
-        let mut revwalk = self.repo.revwalk()?;
+        let repo = self.repo.lock();
+        let mut revwalk = repo.revwalk()?;
         revwalk.push_head()?;
         
         let mut commits = Vec::new();
@@ -305,7 +307,7 @@ impl GitRepository {
             }
             
             let oid = oid?;
-            let commit = self.repo.find_commit(oid)?;
+            let commit = repo.find_commit(oid)?;
             commits.push(self.commit_to_info(&commit)?);
         }
         
@@ -315,8 +317,8 @@ impl GitRepository {
 
 // Unixタイムスタンプをフォーマットする関数
 fn format_timestamp(timestamp: i64) -> String {
-    let dt = chrono::NaiveDateTime::from_timestamp_opt(timestamp, 0)
-        .unwrap_or_else(|| chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap());
+    let dt = DateTime::from_timestamp(timestamp, 0)
+        .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap());
     dt.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
@@ -329,9 +331,7 @@ impl CommitInfo {
             id: commit.id().to_string(),
             message: commit.message().unwrap_or("").to_string(),
             author: author.name().unwrap_or("").to_string(),
-            email: author.email().unwrap_or("").to_string(),
-            time: time.seconds(),
-            timestamp: format_time(&time),
+            timestamp: time.seconds(),
         }
     }
 }
