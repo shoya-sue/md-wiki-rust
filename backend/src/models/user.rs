@@ -7,6 +7,8 @@ use argon2::{
     Argon2,
 };
 use rand::Rng;
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum UserRole {
@@ -47,6 +49,7 @@ impl UserRole {
 pub struct User {
     pub id: i64,
     pub username: String,
+    #[serde(skip_serializing)]
     pub password_hash: String,
     pub email: String,
     pub role: UserRole,
@@ -118,4 +121,58 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
     Argon2::default()
         .verify_password(password.as_bytes(), &parsed_hash)
         .is_ok()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    Admin,
+    Editor,
+    Viewer,
+}
+
+impl Role {
+    pub fn can_edit(&self) -> bool {
+        matches!(self, Role::Admin | Role::Editor)
+    }
+
+    pub fn can_manage_users(&self) -> bool {
+        matches!(self, Role::Admin)
+    }
+}
+
+impl fmt::Display for Role {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Role::Admin => write!(f, "admin"),
+            Role::Editor => write!(f, "editor"),
+            Role::Viewer => write!(f, "viewer"),
+        }
+    }
+}
+
+impl FromStr for Role {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "admin" => Ok(Role::Admin),
+            "editor" => Ok(Role::Editor),
+            "viewer" => Ok(Role::Viewer),
+            _ => Err(format!("Invalid role: {}", s)),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RegistrationData {
+    pub username: String,
+    pub password: String,
+    pub role: Role,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PasswordChangeRequest {
+    pub current_password: String,
+    pub new_password: String,
 } 
