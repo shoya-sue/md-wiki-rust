@@ -1,0 +1,71 @@
+FROM almalinux:9 as builder
+
+# 開発ツールのインストール
+RUN dnf -y update && dnf -y install --allowerasing \
+    gcc \
+    make \
+    pkg-config \
+    openssl-devel \
+    sqlite-devel \
+    git \
+    curl \
+    && dnf clean all
+
+# Rustのインストール
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# アプリケーションディレクトリの作成
+WORKDIR /app
+
+# Cargo.toml と Cargo.lock をコピー (依存関係のキャッシュのため)
+COPY Cargo.toml Cargo.lock ./
+
+# ダミーのソースをコピーして依存関係をビルド
+RUN mkdir -p src && \
+    echo "fn main() {println!(\"dummy\")}" > src/main.rs && \
+    echo "pub fn dummy() {}" > src/lib.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# 実際のソースコードをコピー
+COPY . .
+
+# データベース初期化用のスクリプトを実行可能にする
+RUN if [ -f scripts/init_db.sh ]; then chmod +x scripts/init_db.sh; fi
+
+# キャッシュを消去してリビルド
+RUN cargo clean -p md-wiki-rust-backend && \
+    cargo build --release
+
+# 実行環境
+FROM almalinux:9
+
+# 必要なランタイム依存関係をインストール
+RUN dnf -y update && dnf -y install --allowerasing \
+    openssl \
+    sqlite \
+    git \
+    ca-certificates \
+    && dnf clean all
+
+# アプリケーションディレクトリの作成
+WORKDIR /app
+
+# バイナリをコピー
+COPY --from=builder /app/target/release/md-wiki-rust-backend /app/
+COPY --from=builder /app/migrations /app/migrations
+
+# ストレージディレクトリを作成
+RUN mkdir -p /app/storage
+
+# 実行ユーザーの作成
+RUN useradd -m appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# ポートを公開
+EXPOSE 3000
+
+# 起動コマンド
+CMD ["/app/md-wiki-rust-backend"]

@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./storage:/app/storage
+    environment:
+      - DATABASE_URL=/app/storage/database.sqlite
+      - JWT_SECRET=your_jwt_secret_here
+      - RUST_LOG=info
+    restart: unless-stopped
+
+  # フロントエンドはTauriなので、開発時はローカルで実行します
+  # Tauriはデスクトップアプリケーションとして動作するため
+  # ここではコメントアウトしています
+  
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "1420:1420"
+  #   depends_on:
+  #     - backend
