@@ -23,8 +23,8 @@ COPY Cargo.toml Cargo.lock ./
 
 # ダミーのソースをコピーして依存関係をビルド
 RUN mkdir -p src && \
-    echo "fn main() {println!(\"dummy\")}" > src/main.rs && \
-    echo "pub fn dummy() {}" > src/lib.rs && \
+    echo 'fn main() {println!("dummy")}' > src/main.rs && \
+    echo 'pub fn dummy() {}' > src/lib.rs && \
     cargo build --release && \
     rm -rf src
 

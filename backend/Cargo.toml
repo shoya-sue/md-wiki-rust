@@ -5,6 +5,15 @@ edition = "2021"
 authors = [""]
 description = "Backend API for Markdown Wiki built with Rust"
 
+# バイナリファイルとライブラリを明示的に分ける
+[[bin]]
+name = "md-wiki-rust-backend"
+path = "src/main.rs"
+
+[lib]
+name = "md_wiki_rust_backend"
+path = "src/lib.rs"
+
 [dependencies]
 # Web framework
 axum = { version = "0.7", features = ["multipart"] }
@@ -65,4 +74,4 @@ tokio-test = "0.4"
 
 [features]
 default = []
-vendored-ssl = ["git2/vendored-openssl"] 
+vendored-ssl = ["git2/vendored-openssl"]
