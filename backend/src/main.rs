@@ -1,10 +1,11 @@
 use std::net::SocketAddr;
 use axum::{
-    routing::{get, post},
+    routing::get,
     Router,
 };
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use dotenv::dotenv;
 
 mod config;
 mod error;
@@ -24,13 +25,9 @@ async fn main() {    // Initialize logging
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // dotenvの使用はオプションに変更（環境変数が設定されていれば使用しない）
-    if std::env::var("DATABASE_URL").is_err() {
-        tracing::info!("Loading environment variables from .env file");
-        dotenv::dotenv().ok();
-    } else {
-        tracing::info!("Using environment variables from docker-compose.yml");
-    }
+    // 環境変数の読み込み（Dockerから設定されている場合は無視される）
+    dotenv().ok();
+    tracing::info!("Environment loaded");
 
     // 一時的にデータベース初期化をコメントアウト
     // let db = db::init_db().await.expect("Failed to initialize database");
@@ -44,16 +41,14 @@ async fn main() {    // Initialize logging
     let app = Router::new()
         .route("/health", get(health_check))
     // .with_state(db) // 一時的にコメントアウト
-        .layer(cors);
-
-    // Start server
+        .layer(cors);    // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000)); // 0.0.0.0に変更してコンテナ外からのアクセスを許可
     tracing::info!("listening on {}", addr);
     
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    // Axum 0.7ではhyperを直接使用する必要がある
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    tracing::info!("Server started, listening on {}", addr);
+    axum::serve(listener, app).await.unwrap();
 }
 
 async fn health_check() -> &'static str {
