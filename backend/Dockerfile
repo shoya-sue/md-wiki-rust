@@ -21,8 +21,8 @@ WORKDIR /app
 # Cargo.toml と Cargo.lock をコピー (依存関係のキャッシュのため)
 COPY Cargo.toml Cargo.lock ./
 
-# src全体をコピー
-COPY src/ ./src/
+# 実際のソースコード全体をコピー
+COPY . .
 
 # ビルド
 RUN cargo build --release && \
@@ -44,7 +44,9 @@ WORKDIR /app
 
 # バイナリをコピー
 COPY --from=builder /app/target/release/md-wiki-rust-backend /app/
-COPY --from=builder /app/migrations /app/migrations
+
+# migrationsディレクトリを作成（コンテナ内で必要な場合）
+RUN mkdir -p /app/migrations
 
 # ストレージディレクトリを作成
 RUN mkdir -p /app/storage
