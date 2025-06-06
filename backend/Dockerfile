@@ -36,7 +36,8 @@ RUN if [ -f scripts/init_db.sh ]; then chmod +x scripts/init_db.sh; fi
 
 # キャッシュを消去してリビルド
 RUN cargo clean -p md-wiki-rust-backend && \
-    cargo build --release
+    cargo build --release && \
+    ls -la target/release/
 
 # 実行環境
 FROM almalinux:9
@@ -67,5 +68,8 @@ USER appuser
 # ポートを公開
 EXPOSE 3000
 
-# 起動コマンド
-CMD ["/app/md-wiki-rust-backend"]
+# デバッグ用：実行ファイルが存在するか確認
+RUN ls -la /app
+
+# 起動コマンド（より詳細なエラーメッセージを表示）
+CMD ["/bin/bash", "-c", "cd /app && RUST_BACKTRACE=1 ./md-wiki-rust-backend || (echo 'Application failed to start:' && cat /app/error.log)"]
