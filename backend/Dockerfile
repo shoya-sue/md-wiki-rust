@@ -21,22 +21,11 @@ WORKDIR /app
 # Cargo.toml と Cargo.lock をコピー (依存関係のキャッシュのため)
 COPY Cargo.toml Cargo.lock ./
 
-# ダミーのソースをコピーして依存関係をビルド
-RUN mkdir -p src && \
-    echo 'fn main() {println!("dummy")}' > src/main.rs && \
-    echo 'pub fn dummy() {}' > src/lib.rs && \
-    cargo build --release && \
-    rm -rf src
+# src全体をコピー
+COPY src/ ./src/
 
-# 実際のソースコードをコピー
-COPY . .
-
-# データベース初期化用のスクリプトを実行可能にする
-RUN if [ -f scripts/init_db.sh ]; then chmod +x scripts/init_db.sh; fi
-
-# キャッシュを消去してリビルド
-RUN cargo clean -p md-wiki-rust-backend && \
-    cargo build --release && \
+# ビルド
+RUN cargo build --release && \
     ls -la target/release/
 
 # 実行環境
@@ -71,5 +60,5 @@ EXPOSE 3000
 # デバッグ用：実行ファイルが存在するか確認
 RUN ls -la /app
 
-# 起動コマンド（より詳細なエラーメッセージを表示）
-CMD ["/bin/bash", "-c", "cd /app && RUST_BACKTRACE=1 ./md-wiki-rust-backend || (echo 'Application failed to start:' && cat /app/error.log)"]
+# 起動コマンド
+CMD ["sh", "-c", "cd /app && ./md-wiki-rust-backend"]
