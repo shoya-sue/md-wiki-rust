@@ -12,10 +12,10 @@ pub enum AppError {
     Auth(String),
     
     #[error("Database error: {0}")]
-    Database(#[from] rusqlite::Error),
+    Database(String),
     
     #[error("Git operation error: {0}")]
-    Git(#[from] git2::Error),
+    Git(String),
     
     #[error("Not found: {0}")]
     NotFound(String),
@@ -25,6 +25,31 @@ pub enum AppError {
     
     #[error("Internal server error: {0}")]
     Internal(String),
+}
+
+// エラーの変換処理
+impl From<rusqlite::Error> for AppError {
+    fn from(err: rusqlite::Error) -> Self {
+        AppError::Database(err.to_string())
+    }
+}
+
+impl From<git2::Error> for AppError {
+    fn from(err: git2::Error) -> Self {
+        AppError::Git(err.to_string())
+    }
+}
+
+impl From<tokio_rusqlite::Error> for AppError {
+    fn from(err: tokio_rusqlite::Error) -> Self {
+        AppError::Database(err.to_string())
+    }
+}
+
+impl From<std::io::Error> for AppError {
+    fn from(err: std::io::Error) -> Self {
+        AppError::Internal(err.to_string())
+    }
 }
 
 impl IntoResponse for AppError {
@@ -44,4 +69,4 @@ impl IntoResponse for AppError {
     }
 }
 
-pub type AppResult<T> = Result<T, AppError>; 
+pub type AppResult<T> = Result<T, AppError>;

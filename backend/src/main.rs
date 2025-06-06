@@ -6,16 +6,17 @@ use axum::{
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod api;
 mod config;
-mod db;
 mod error;
-mod models;
-mod utils;
+
+// 一時的にコメントアウト
+// mod db;
+// mod api;
+// mod models;
+// mod utils;
 
 #[tokio::main]
-async fn main() {
-    // Initialize logging
+async fn main() {    // Initialize logging
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
@@ -23,13 +24,18 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Load environment variables
-    dotenv::dotenv().ok();
+    // dotenvの使用はオプションに変更（環境変数が設定されていれば使用しない）
+    if std::env::var("DATABASE_URL").is_err() {
+        tracing::info!("Loading environment variables from .env file");
+        dotenv::dotenv().ok();
+    } else {
+        tracing::info!("Using environment variables from docker-compose.yml");
+    }
 
-    // Initialize database
-    let db = db::init_db().await.expect("Failed to initialize database");
+    // 一時的にデータベース初期化をコメントアウト
+    // let db = db::init_db().await.expect("Failed to initialize database");
 
-    // Build application
+    // Build application with minimal routes
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -37,11 +43,11 @@ async fn main() {
 
     let app = Router::new()
         .route("/health", get(health_check))
-        .with_state(db)
+    // .with_state(db) // 一時的にコメントアウト
         .layer(cors);
 
     // Start server
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000)); // 0.0.0.0に変更してコンテナ外からのアクセスを許可
     tracing::info!("listening on {}", addr);
     
     axum::Server::bind(&addr)
@@ -52,4 +58,4 @@ async fn main() {
 
 async fn health_check() -> &'static str {
     "OK"
-} 
+}
