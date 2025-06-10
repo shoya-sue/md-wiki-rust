@@ -5,19 +5,14 @@ use axum::{
 };
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use dotenv::dotenv;
 
-mod config;
-mod error;
-
-// 一時的にコメントアウト
-// mod db;
-// mod api;
-// mod models;
-// mod utils;
+async fn health_check() -> &'static str {
+    "OK"
+}
 
 #[tokio::main]
-async fn main() {    // Initialize logging
+async fn main() {
+    // Initialize logging
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
@@ -25,12 +20,7 @@ async fn main() {    // Initialize logging
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // 環境変数の読み込み（Dockerから設定されている場合は無視される）
-    dotenv().ok();
-    tracing::info!("Environment loaded");
-
-    // 一時的にデータベース初期化をコメントアウト
-    // let db = db::init_db().await.expect("Failed to initialize database");
+    tracing::info!("Starting application");
 
     // Build application with minimal routes
     let cors = CorsLayer::new()
@@ -40,17 +30,13 @@ async fn main() {    // Initialize logging
 
     let app = Router::new()
         .route("/health", get(health_check))
-    // .with_state(db) // 一時的にコメントアウト
-        .layer(cors);    // Start server
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000)); // 0.0.0.0に変更してコンテナ外からのアクセスを許可
-    tracing::info!("listening on {}", addr);
-    
-    // Axum 0.7ではhyperを直接使用する必要がある
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    tracing::info!("Server started, listening on {}", addr);
-    axum::serve(listener, app).await.unwrap();
-}
+        .route("/", get(|| async { "Hello, World!" }))
+        .layer(cors);
 
-async fn health_check() -> &'static str {
-    "OK"
+    // Start server
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    tracing::info!("Listening on {}", addr);
+    
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
