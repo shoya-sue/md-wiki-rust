@@ -1,66 +1,49 @@
-FROM almalinux:9 as builder
+# 1. ビルダーステージ
+FROM rust:latest as builder
 
-# 開発ツールのインストール
-RUN dnf -y update && dnf -y install --allowerasing \
-    gcc \
-    make \
+# ビルドに必要な依存関係をインストール
+RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
-    openssl-devel \
-    sqlite-devel \
+    libssl-dev \
+    libsqlite3-dev \
     git \
-    curl \
-    && dnf clean all
+    && rm -rf /var/lib/apt/lists/*
 
-# Rustのインストール
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# アプリケーションディレクトリの作成
 WORKDIR /app
 
-# Cargo.toml と Cargo.lock をコピー (依存関係のキャッシュのため)
-COPY Cargo.toml Cargo.lock ./
-
-# 実際のソースコード全体をコピー
+# アプリケーションのソースコードをコピー
 COPY . .
 
 # ビルド
-RUN cargo build --release && \
-    ls -la target/release/
+# backend ディレクトリに移動してビルドする
+RUN cd backend && cargo fix --allow-dirty --allow-staged && cargo build --release
 
-# 実行環境
-FROM almalinux:9
+# 2. 実行ステージ
+FROM debian:bookworm-slim as runner
 
-# 必要なランタイム依存関係をインストール
-RUN dnf -y update && dnf -y install --allowerasing \
-    openssl \
-    sqlite \
-    git \
+# 実行に必要なライブラリをインストール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl-dev \
+    libsqlite3-dev \
     ca-certificates \
-    && dnf clean all
+    && rm -rf /var/lib/apt/lists/*
 
-# アプリケーションディレクトリの作成
 WORKDIR /app
 
-# バイナリをコピー
-COPY --from=builder /app/target/release/md-wiki-rust-backend /app/
+# ビルドされたバイナリをコピー
+COPY --from=builder /app/backend/target/release/md-wiki-rust-backend .
 
-# migrationsディレクトリを作成（コンテナ内で必要な場合）
-RUN mkdir -p /app/migrations
+# migrationsとstorageディレクトリを作成
+RUN mkdir -p /app/migrations /app/storage
 
-# ストレージディレクトリを作成
-RUN mkdir -p /app/storage
+# 実行ユーザーを作成し、権限を付与
+RUN useradd -m -s /bin/bash appuser && \
+    chown -R appuser:appuser /app
 
-# 実行ユーザーの作成
-RUN useradd -m appuser
-RUN chown -R appuser:appuser /app
 USER appuser
 
 # ポートを公開
 EXPOSE 3000
 
-# デバッグ用：実行ファイルが存在するか確認
-RUN ls -la /app
-
 # 起動コマンド
-CMD ["sh", "-c", "cd /app && ./md-wiki-rust-backend"]
+CMD ["./md-wiki-rust-backend"]
