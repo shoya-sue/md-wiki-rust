@@ -28,4 +28,13 @@ pub fn create_token(user_id: i64, role: &str) -> Result<String, AppError> {
 
     encode(&Header::default(), &claims, &key)
         .map_err(|e| AppError::Internal(format!("Failed to create token: {}", e)))
+}
+
+pub fn verify_token(token: &str) -> Result<Claims, AppError> {
+    let secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "your-secret-key".to_string());
+    let key = jsonwebtoken::DecodingKey::from_secret(secret.as_bytes());
+
+    jsonwebtoken::decode::<Claims>(token, &key, &jsonwebtoken::Validation::default())
+        .map(|data| data.claims)
+        .map_err(|e| AppError::Auth(format!("Invalid token: {}", e)))
 } 

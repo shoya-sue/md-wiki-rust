@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 
 use crate::AppState;
-use crate::git_ops::{GitOps, CommitInfo};
+use crate::git_ops::{GitRepository, CommitInfo};
 
 #[derive(Serialize, Deserialize)]
 pub struct Document {
@@ -84,7 +84,7 @@ pub async fn save_document(
     match fs::write(&file_path, &document.content) {
         Ok(_) => {
             // Gitコミットを作成
-            let git_ops = match GitOps::new(&state.markdown_dir) {
+            let git_repo = match GitRepository::new(&state.markdown_dir) {
                 Ok(ops) => ops,
                 Err(e) => {
                     return Err((
@@ -97,7 +97,7 @@ pub async fn save_document(
             };
             
             let commit_message = format!("Update {}.md", filename);
-            match git_ops.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
+            match git_repo.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
                 Ok(_) => Ok(StatusCode::OK),
                 Err(e) => Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -226,7 +226,7 @@ pub async fn get_document_history(
 ) -> Result<Json<DocumentHistory>, (StatusCode, Json<serde_json::Value>)> {
     let file_path = format!("{}.md", filename);
     
-    let git_ops = match GitOps::new(&state.markdown_dir) {
+    let git_repo = match GitRepository::new(&state.markdown_dir) {
         Ok(ops) => ops,
         Err(e) => {
             return Err((
@@ -238,7 +238,7 @@ pub async fn get_document_history(
         }
     };
     
-    match git_ops.get_file_history(&file_path) {
+    match git_repo.get_file_history(&file_path) {
         Ok(commits) => Ok(Json(DocumentHistory {
             filename,
             commits,
@@ -259,7 +259,7 @@ pub async fn get_document_version(
 ) -> Result<Json<DocumentVersion>, (StatusCode, Json<serde_json::Value>)> {
     let file_path = format!("{}.md", filename);
     
-    let git_ops = match GitOps::new(&state.markdown_dir) {
+    let git_repo = match GitRepository::new(&state.markdown_dir) {
         Ok(ops) => ops,
         Err(e) => {
             return Err((
@@ -272,7 +272,7 @@ pub async fn get_document_version(
     };
     
     // 履歴から特定のコミット情報を取得
-    let history = match git_ops.get_file_history(&file_path) {
+    let history = match git_repo.get_file_history(&file_path) {
         Ok(commits) => commits,
         Err(e) => {
             return Err((
@@ -297,7 +297,7 @@ pub async fn get_document_version(
     };
     
     // 特定バージョンの内容を取得
-    match git_ops.get_file_at_commit(&file_path, &commit_info.id) {
+    match git_repo.get_file_content_at_commit(&file_path, &commit_info.id) {
         Ok(content) => Ok(Json(DocumentVersion {
             filename,
             content,
@@ -333,7 +333,7 @@ pub async fn delete_document(
     match fs::remove_file(&file_path) {
         Ok(_) => {
             // Gitオペレーションを初期化
-            let git_ops = match GitOps::new(&state.markdown_dir) {
+            let git_repo = match GitRepository::new(&state.markdown_dir) {
                 Ok(ops) => ops,
                 Err(e) => {
                     return Err((
@@ -347,12 +347,12 @@ pub async fn delete_document(
             
             // ファイル削除をコミット
             let commit_message = format!("Delete {}.md", filename);
-            match git_ops.remove_file(&format!("{}.md", filename), &commit_message) {
+            match git_repo.remove_file(&format!("{}.md", filename), &commit_message) {
                 Ok(_) => {
                     // データベースからメタデータも削除
                     if let Some(db) = &state.db_manager {
                         // エラーが発生しても処理は続行（ファイルは削除済み）
-                        if let Err(e) = db.delete_document_metadata(&filename) {
+                        if let Err(e) = db.delete_document_metadata(&filename).await {
                             tracing::warn!("Failed to delete metadata for {}: {}", filename, e);
                         }
                     }
@@ -398,7 +398,7 @@ pub async fn create_document(
     match fs::write(&file_path, &document.content) {
         Ok(_) => {
             // Gitコミットを作成
-            let git_ops = match GitOps::new(&state.markdown_dir) {
+            let git_repo = match GitRepository::new(&state.markdown_dir) {
                 Ok(ops) => ops,
                 Err(e) => {
                     return Err((
@@ -411,7 +411,7 @@ pub async fn create_document(
             };
             
             let commit_message = format!("Create {}.md", filename);
-            match git_ops.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
+            match git_repo.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
                 Ok(_) => Ok(Json(document)),
                 Err(e) => Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -452,7 +452,7 @@ pub async fn update_document(
     match fs::write(&file_path, &document.content) {
         Ok(_) => {
             // Gitコミットを作成
-            let git_ops = match GitOps::new(&state.markdown_dir) {
+            let git_repo = match GitRepository::new(&state.markdown_dir) {
                 Ok(ops) => ops,
                 Err(e) => {
                     return Err((
@@ -465,7 +465,7 @@ pub async fn update_document(
             };
             
             let commit_message = format!("Update {}.md", filename);
-            match git_ops.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
+            match git_repo.commit_file(&format!("{}.md", filename), &document.content, &commit_message) {
                 Ok(_) => Ok(StatusCode::OK),
                 Err(e) => Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -482,4 +482,4 @@ pub async fn update_document(
             })),
         )),
     }
-} 
+}

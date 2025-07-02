@@ -1,21 +1,16 @@
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use axum::{
     routing::get,
     Router,
-    response::Html,
 };
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use md_wiki_rust_backend::{AppState, routes, config};
-use std::sync::Arc;
 
 async fn health_check() -> &'static str {
     "OK"
-}
-
-async fn hello_world() -> Html<&'static str> {
-    Html("<h1>Hello, World!</h1>")
 }
 
 #[tokio::main]
@@ -47,20 +42,23 @@ async fn main() {
         config: config.clone(),
     };
 
-    // Build application with routes
+    // CORS設定
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // 基本ルートとAPIルートを統合
-    let base_routes = Router::new()
+    // 静的ファイル配信用のルーター
+    // frontend/dist ディレクトリを配信する
+    // このパスはDockerコンテナ内でのパスに合わせる必要がある
+    let static_files_service = ServeDir::new("frontend/dist")
+        .not_found_service(ServeDir::new("frontend/dist/index.html"));
+
+    // APIルーターと静的ファイル配信を組み合わせる
+    let app = Router::new()
         .route("/health", get(health_check))
-        .route("/", get(hello_world));
-        
-    // APIルーターの追加（コメントアウトして徐々に追加する）
-    let app = base_routes
-        // .merge(routes::create_router(state))
+        .nest("/api", routes::create_router(state)) // APIルートを /api 以下にネスト
+        .fallback_service(static_files_service) // APIにマッチしないものは静的ファイルとして配信
         .layer(cors);
 
     // Start server

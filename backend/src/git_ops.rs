@@ -16,17 +16,6 @@ pub struct CommitInfo {
     pub timestamp: i64,
 }
 
-impl fmt::Debug for CommitInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CommitInfo")
-            .field("id", &self.id)
-            .field("author", &self.author)
-            .field("message", &self.message)
-            .field("timestamp", &self.timestamp)
-            .finish()
-    }
-}
-
 #[derive(Clone)]
 pub struct GitRepository {
     repo: Arc<Mutex<Repository>>,
@@ -249,8 +238,7 @@ impl GitRepository {
     }
     
     // HEADコミットを取得
-    fn get_head_commit(&self) -> Result<Commit, GitError> {
-        let repo = self.repo.lock();
+    fn get_head_commit(repo: &Repository) -> Result<Commit, GitError> {
         let head = repo.head()?;
         let head_commit = head.peel_to_commit()?;
         Ok(head_commit)
@@ -279,7 +267,7 @@ impl GitRepository {
         
         // コミット作成
         let signature = self.get_signature()?;
-        let parent_commit = self.get_head_commit()?;
+        let parent_commit = GitRepository::get_head_commit(&repo)?;
         
         let commit_id = repo.commit(
             Some("HEAD"), 

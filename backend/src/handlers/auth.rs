@@ -6,8 +6,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
-use crate::models::{LoginCredentials, UserRegistration, ChangePasswordRequest, User};
+use crate::models::{LoginCredentials, UserRegistration, ChangePasswordRequest, User, Role};
 use crate::auth::jwt;
+use crate::auth::{Claims, create_token};
+use crate::models::user::verify_password;
+use std::str::FromStr;
 
 // ユーザー登録
 pub async fn register_user(
@@ -28,13 +31,19 @@ pub async fn register_user(
     
     // 役割の設定（指定がなければデフォルトでViewer）
     let role = registration.role.as_deref().unwrap_or("viewer");
+    let role_enum = Role::from_str(role).map_err(|e| (
+        StatusCode::BAD_REQUEST,
+        Json(serde_json::json!({
+            "error": format!("Invalid role: {}", e)
+        })),
+    ))?;
     
     // ユーザー作成
     match db.create_user(
         &registration.username,
         &registration.password,
         &registration.email,
-        role,
+        role_enum,
     ).await {
         Ok(_) => Ok(StatusCode::CREATED),
         Err(e) => {
@@ -79,16 +88,15 @@ pub async fn login(
     match db.authenticate_user(&credentials.username, &credentials.password).await {
         Ok(Some(user)) => {
             // JWTトークン生成
-            match jwt::generate_token(&user) {
+            match crate::auth::create_token(user.id, &user.role.to_string()) {
                 Ok(token) => {
                     let user_without_hash = User {
                         id: user.id,
                         username: user.username,
                         password_hash: "".to_string(), // パスワードハッシュは返さない
-                        email: user.email,
                         role: user.role,
                         created_at: user.created_at,
-                        last_login: user.last_login,
+                        updated_at: user.updated_at,
                     };
                     
                     Ok(Json(serde_json::json!({
@@ -145,13 +153,7 @@ pub async fn change_password(
     
     // パスワード変更
     match db.change_password(user_id, &request.current_password, &request.new_password).await {
-        Ok(true) => Ok(StatusCode::OK),
-        Ok(false) => Err((
-            StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({
-                "error": "Current password is incorrect"
-            })),
-        )),
+        Ok(()) => Ok(StatusCode::OK),
         Err(e) => Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({
@@ -186,10 +188,9 @@ pub async fn get_all_users(
                     id: user.id,
                     username: user.username,
                     password_hash: "".to_string(),
-                    email: user.email,
                     role: user.role,
                     created_at: user.created_at,
-                    last_login: user.last_login,
+                    updated_at: user.updated_at,
                 }
             }).collect();
             
@@ -229,10 +230,9 @@ pub async fn get_user(
                 id: user.id,
                 username: user.username,
                 password_hash: "".to_string(),
-                email: user.email,
                 role: user.role,
                 created_at: user.created_at,
-                last_login: user.last_login,
+                updated_at: user.updated_at,
             };
             
             Ok(Json(user_without_hash))

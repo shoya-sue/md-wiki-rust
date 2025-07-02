@@ -1,4 +1,4 @@
-use rusqlite::{params, OptionalExtension, Row};
+use rusqlite::{params, OptionalExtension, Result as RusqliteResult, Row};
 use serde::{Serialize, Deserialize};
 use crate::AppResult;
 use super::DbManager;
@@ -8,149 +8,23 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct User {
-    pub id: i64,
-    pub username: String,
-    pub role: Role,
-    pub created_at: String,
-    pub updated_at: String,
-}
+use std::str::FromStr;
 
 impl User {
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(Self {
             id: row.get(0)?,
             username: row.get(1)?,
-            role: Role::from_str(&row.get::<_, String>(2)?).unwrap_or(Role::Viewer),
-            created_at: row.get(3)?,
-            updated_at: row.get(4)?,
+            password_hash: row.get(2)?,
+            role: Role::from_str(&row.get::<_, String>(3)?).unwrap_or(Role::Viewer),
+            created_at: row.get(4)?,
+            updated_at: row.get(5)?,
         })
     }
 }
 
 impl DbManager {
-    pub async fn create_user(&self, username: &str, password_hash: &str, role: &str) -> Result<i64, AppError> {
-        self.conn
-            .call(move |conn| {
-                conn.execute(
-                    "INSERT INTO users (username, password_hash, role) VALUES (?1, ?2, ?3)",
-                    params![username, password_hash, role],
-                )
-                .and_then(|_| conn.last_insert_rowid())
-                .map_err(AppError::Database)
-            })
-            .await
-    }
-
-    pub async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, AppError> {
-        self.conn
-            .call(move |conn| {
-                conn.query_row(
-                    "SELECT id, username, role, created_at, updated_at FROM users WHERE username = ?1",
-                    params![username],
-                    User::from_row,
-                )
-                .optional()
-                .map_err(AppError::Database)
-            })
-            .await
-    }
-
-    pub async fn get_user_by_id(&self, user_id: i64) -> Result<Option<User>, AppError> {
-        self.conn
-            .call(move |conn| {
-                conn.query_row(
-                    "SELECT id, username, role, created_at, updated_at FROM users WHERE id = ?1",
-                    params![user_id],
-                    User::from_row,
-                )
-                .optional()
-                .map_err(AppError::Database)
-            })
-            .await
-    }
-
-    pub async fn get_password_hash(&self, username: &str) -> Result<Option<String>, AppError> {
-        self.conn
-            .call(move |conn| {
-                conn.query_row(
-                    "SELECT password_hash FROM users WHERE username = ?1",
-                    params![username],
-                    |row| row.get(0),
-                )
-                .optional()
-                .map_err(AppError::Database)
-            })
-            .await
-    }
-
-    pub async fn update_password(&self, user_id: i64, new_password_hash: &str) -> Result<(), AppError> {
-        self.conn
-            .call(move |conn| {
-                conn.execute(
-                    "UPDATE users SET password_hash = ?1 WHERE id = ?2",
-                    params![new_password_hash, user_id],
-                )
-                .map(|_| ())
-                .map_err(AppError::Database)
-            })
-            .await
-    }
-
-    pub async fn get_all_users(&self) -> Result<Vec<User>, AppError> {
-        self.conn
-            .call(move |conn| {
-                let mut stmt = conn.prepare("SELECT id, username, role, created_at, updated_at FROM users")?;
-                let users = stmt
-                    .query_map([], User::from_row)?
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(users)
-            })
-            .await
-            .map_err(AppError::Database)
-    }
-
-    pub fn update_user_role(&self, username: &str, new_role: &str) -> AppResult<bool> {
-        let mut conn = self.conn.lock().unwrap();
-        let rows = conn.execute(
-            "UPDATE users SET role = ? WHERE username = ?",
-            params![new_role, username],
-        )?;
-        Ok(rows > 0)
-    }
-
-    pub fn delete_user(&self, username: &str) -> AppResult<bool> {
-        let mut conn = self.conn.lock().unwrap();
-        let rows = conn.execute(
-            "DELETE FROM users WHERE username = ?",
-            params![username],
-        )?;
-        Ok(rows > 0)
-    }
-
-    pub fn list_users(&self) -> AppResult<Vec<User>> {
-        let mut conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, username, password_hash, role FROM users"
-        )?;
-        
-        let users = stmt.query_map([], |row| {
-            Ok(User {
-                id: row.get(0)?,
-                username: row.get(1)?,
-                password_hash: row.get(2)?,
-                role: row.get(3)?,
-            })
-        })?;
-        
-        users.collect::<Result<_, _>>().map_err(Into::into)
-    }
-}
-
-impl crate::db::Database {
-    pub async fn create_user(&self, username: &str, password: &str, role: Role) -> Result<i64, AppError> {
+    pub async fn create_user(&self, username: &str, password: &str, email: &str, role: Role) -> Result<i64, AppError> {
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
         let password_hash = argon2
@@ -159,100 +33,154 @@ impl crate::db::Database {
             .to_string();
 
         let role_str = role.to_string();
+        let username = username.to_string();
+        let email = email.to_string();
         
-        self.connection
+        self.conn
             .call(move |conn| {
                 conn.execute(
-                    "INSERT INTO users (username, password_hash, role) VALUES (?1, ?2, ?3)",
-                    rusqlite::params![username, password_hash, role_str],
-                )
-                .map(|_| conn.last_insert_rowid())
-                .map_err(AppError::Database)
+                    "INSERT INTO users (username, password_hash, role, email, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![username, password_hash, role_str, email, chrono::Utc::now().to_rfc3339(), chrono::Utc::now().to_rfc3339()],
+                )?;
+                Ok(conn.last_insert_rowid())
             })
-            .await
+            .await.map_err(|e| AppError::Database(e.to_string()))
     }
 
-    pub async fn authenticate_user(&self, username: &str, password: &str) -> Result<User, AppError> {
-        let user = self.connection
+    pub async fn get_user_by_username(&self, username: &str) -> Result<Option<User>, AppError> {
+        let username = username.to_string();
+        self.conn
             .call(move |conn| {
                 conn.query_row(
-                    "SELECT id, username, password_hash, role FROM users WHERE username = ?1",
-                    [username],
-                    |row| {
-                        Ok(User {
-                            id: row.get(0)?,
-                            username: row.get(1)?,
-                            password_hash: row.get(2)?,
-                            role: Role::from_str(&row.get::<_, String>(3)?),
-                        })
-                    },
+                    "SELECT id, username, password_hash, role, created_at, updated_at FROM users WHERE username = ?1",
+                    params![username],
+                    User::from_row,
                 )
-                .map_err(AppError::Database)
+                .optional()
             })
-            .await?;
-
-        let parsed_hash = PasswordHash::new(&user.password_hash)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
-
-        if Argon2::default()
-            .verify_password(password.as_bytes(), &parsed_hash)
-            .is_ok()
-        {
-            Ok(user)
-        } else {
-            Err(AppError::Auth("Invalid password".to_string()))
-        }
+            .await.map_err(|e| AppError::Database(e.to_string()))
     }
 
-    pub async fn get_all_users(&self) -> Result<Vec<User>, AppError> {
-        self.connection
+    pub async fn get_user_by_id(&self, user_id: i64) -> Result<Option<User>, AppError> {
+        self.conn
             .call(move |conn| {
-                let mut stmt = conn.prepare("SELECT id, username, password_hash, role FROM users")?;
-                let users = stmt
-                    .query_map([], |row| {
-                        Ok(User {
-                            id: row.get(0)?,
-                            username: row.get(1)?,
-                            password_hash: row.get(2)?,
-                            role: Role::from_str(&row.get::<_, String>(3)?),
-                        })
-                    })?
-                    .collect::<Result<Vec<_>, _>>()?;
-                Ok(users)
+                conn.query_row(
+                    "SELECT id, username, password_hash, role, created_at, updated_at FROM users WHERE id = ?1",
+                    params![user_id],
+                    User::from_row,
+                )
+                .optional()
             })
-            .await
-            .map_err(AppError::Database)
+            .await.map_err(|e| AppError::Database(e.to_string()))
     }
 
-    pub async fn change_password(&self, user_id: i64, current_password: &str, new_password: &str) -> Result<(), AppError> {
-        let user = self.get_user_by_id(user_id).await?;
+    pub async fn get_password_hash(&self, username: &str) -> Result<Option<String>, AppError> {
+        let username = username.to_string();
+        self.conn
+            .call(move |conn| {
+                conn.query_row(
+                    "SELECT password_hash FROM users WHERE username = ?1",
+                    params![username],
+                    |row| row.get(0),
+                )
+                .optional()
+            })
+            .await.map_err(|e| AppError::Database(e.to_string()))
+    }
 
-        let parsed_hash = PasswordHash::new(&user.password_hash)
-            .map_err(|e| AppError::Internal(e.to_string()))?;
-
-        if Argon2::default()
-            .verify_password(current_password.as_bytes(), &parsed_hash)
-            .is_err()
-        {
-            return Err(AppError::Auth("Invalid current password".to_string()));
-        }
-
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        let new_password_hash = argon2
-            .hash_password(new_password.as_bytes(), &salt)
-            .map_err(|e| AppError::Internal(e.to_string()))?
-            .to_string();
-
-        self.connection
+    pub async fn update_password(&self, user_id: i64, new_password_hash: &str) -> Result<(), AppError> {
+        let new_password_hash = new_password_hash.to_string();
+        self.conn
             .call(move |conn| {
                 conn.execute(
                     "UPDATE users SET password_hash = ?1 WHERE id = ?2",
-                    rusqlite::params![new_password_hash, user_id],
+                    params![new_password_hash, user_id],
                 )
                 .map(|_| ())
-                .map_err(AppError::Database)
             })
-            .await
+            .await.map_err(|e| AppError::Database(e.to_string()))
     }
-} 
+
+    pub async fn get_all_users(&self) -> Result<Vec<User>, AppError> {
+        self.conn
+            .call(move |conn| {
+                let mut stmt = conn.prepare("SELECT id, username, password_hash, role, created_at, updated_at FROM users")?;
+                let users_iter = stmt.query_map([], User::from_row)?;
+                users_iter.collect::<RusqliteResult<Vec<User>>>()
+            })
+            .await.map_err(|e| AppError::Database(e.to_string()))
+    }
+
+    pub async fn update_user_role(&self, username: &str, new_role: &str) -> Result<bool, AppError> {
+        let username_clone = username.to_string();
+        let new_role_clone = new_role.to_string();
+        self.conn.call(move |conn| {
+            let rows = conn.execute(
+                "UPDATE users SET role = ? WHERE username = ?",
+                params![new_role_clone, username_clone],
+            )?;
+            Ok(rows > 0)
+        }).await.map_err(|e| AppError::Database(e.to_string()))
+    }
+
+    pub async fn delete_user(&self, username: &str) -> Result<bool, AppError> {
+        let username_clone = username.to_string();
+        self.conn.call(move |conn| {
+            let rows = conn.execute(
+                "DELETE FROM users WHERE username = ?",
+                params![username_clone],
+            )?;
+            Ok(rows > 0)
+        }).await.map_err(|e| AppError::Database(e.to_string()))
+    }
+
+    pub async fn list_users(&self) -> Result<Vec<User>, AppError> {
+        self.conn.call(move |conn| {
+            let mut stmt = conn.prepare("SELECT id, username, password_hash, role, created_at, updated_at FROM users")?;
+            let users_iter = stmt.query_map([], User::from_row)?;
+            users_iter.collect::<RusqliteResult<Vec<User>>>()
+        }).await.map_err(|e| AppError::Database(e.to_string()))
+    }
+
+    pub async fn authenticate_user(&self, username: &str, password: &str) -> Result<Option<User>, AppError> {
+        let user = self.get_user_by_username(username).await?;
+
+        if let Some(user) = user {
+            if verify_password(&user.password_hash, password) {
+                Ok(Some(user))
+            } else {
+                Ok(None) // Invalid password
+            }
+        } else {
+            Ok(None) // User not found
+        }
+    }
+
+    pub async fn change_password(&self, user_id: i64, current_password: &str, new_password: &str) -> Result<(), AppError> {
+        let user = self.get_user_by_id(user_id).await?.ok_or_else(|| AppError::Auth("User not found".to_string()))?;
+
+        if !verify_password(&user.password_hash, current_password) {
+            return Err(AppError::Auth("Invalid current password".to_string()));
+        }
+
+        let new_password_hash = hash_password(new_password)?;
+
+        self.update_password(user_id, &new_password_hash).await
+    }
+}
+
+fn verify_password(hash: &str, password: &str) -> bool {
+    if let Ok(parsed_hash) = PasswordHash::new(hash) {
+        Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok()
+    } else {
+        false
+    }
+}
+
+fn hash_password(password: &str) -> Result<String, AppError> {
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    argon2.hash_password(password.as_bytes(), &salt)
+        .map(|hash| hash.to_string())
+        .map_err(|e| AppError::Internal(e.to_string()))
+}

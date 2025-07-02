@@ -6,7 +6,7 @@ pub mod documents;
 pub mod users;
 pub mod tags;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DbManager {
     conn: Connection,
 }
@@ -23,12 +23,14 @@ impl DbManager {
     pub async fn init(&self) -> Result<(), AppError> {
         self.conn
             .call(|conn| {
-                conn.execute_batch(include_str!("schema.sql"))
-                    .map_err(|e| AppError::Database(format!("Failed to initialize database: {}", e)))
+                conn.execute_batch(include_str!("schema.sql"))?;
+                Ok(())
             })
             .await
+            .map_err(|e| AppError::Database(format!("Failed to initialize database: {}", e)))
     }
 }
 
+pub use crate::models::user::User;
 pub use documents::DocumentMeta;
-pub use users::User; 
+pub use tags::Tag; 

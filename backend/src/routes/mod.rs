@@ -1,13 +1,11 @@
-// ルーティングモジュール
-// 将来的な拡張性のために空のモジュールを用意 
-
 use axum::{
-    routing::{get, post, put, delete},
+    routing::{get, post},
     Router,
+    middleware,
 };
 
 use crate::handlers::{
-    auth::{login, register, get_current_user},
+    auth::{login, register_user, get_current_user},
     document::{
         get_document,
         save_document,
@@ -21,19 +19,17 @@ use crate::handlers::{
         get_document_metadata,
         update_document_metadata,
         get_all_tags,
-        get_document_by_tag,
-        get_recent_documents,
+        search_documents_by_tag,
     },
 };
-use crate::auth::middleware::{auth_layer, role_layer};
-use crate::models::user::UserRole;
+use crate::auth::middleware::{require_auth};
 use crate::AppState;
 
 pub fn create_router(state: AppState) -> Router {
     let auth_routes = Router::new()
-        .route("/register", post(register))
+        .route("/register", post(register_user))
         .route("/login", post(login))
-        .route("/me", get(get_current_user))
+        .route("/me", get(get_current_user).route_layer(middleware::from_fn_with_state(state.clone(), require_auth)))
         .with_state(state.clone());
 
     let document_routes = Router::new()
@@ -50,18 +46,17 @@ pub fn create_router(state: AppState) -> Router {
             get(get_document_metadata)
                 .put(update_document_metadata)
         )
-        .layer(auth_layer())
+        .route_layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .with_state(state.clone());
 
     let tag_routes = Router::new()
         .route("/", get(get_all_tags))
-        .route("/:tag/documents", get(get_document_by_tag))
-        .layer(auth_layer())
+        .route("/:tag/documents", get(search_documents_by_tag))
+        .route_layer(middleware::from_fn_with_state(state.clone(), require_auth))
         .with_state(state.clone());
 
     Router::new()
-        .nest("/api/auth", auth_routes)
-        .nest("/api/documents", document_routes)
-        .nest("/api/tags", tag_routes)
-        .with_state(state)
+        .nest("/auth", auth_routes)
+        .nest("/documents", document_routes)
+        .nest("/tags", tag_routes)
 } 

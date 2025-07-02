@@ -10,64 +10,27 @@ use rand::Rng;
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub enum UserRole {
-    Admin,
-    Editor,
-    Viewer,
-}
-
-impl UserRole {
-    pub fn has_permission(&self, required_role: &UserRole) -> bool {
-        use UserRole::*;
-        match (self, required_role) {
-            (Admin, _) => true,
-            (Editor, Editor | Viewer) => true,
-            (Viewer, Viewer) => true,
-            _ => false,
-        }
-    }
-
-    pub fn from_str(role: &str) -> Self {
-        match role {
-            "admin" => UserRole::Admin,
-            "editor" => UserRole::Editor,
-            _ => UserRole::Viewer,
-        }
-    }
-    
-    pub fn to_string(&self) -> String {
-        match self {
-            UserRole::Admin => "admin".to_string(),
-            UserRole::Editor => "editor".to_string(),
-            UserRole::Viewer => "viewer".to_string(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: i64,
     pub username: String,
     #[serde(skip_serializing)]
     pub password_hash: String,
-    pub email: String,
-    pub role: UserRole,
-    pub created_at: i64,
-    pub last_login: Option<i64>,
+    pub role: Role,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 impl User {
-    pub fn new(username: String, password: &str, role: UserRole) -> crate::AppResult<Self> {
+    pub fn new(username: String, password: &str, role: Role) -> crate::AppResult<Self> {
         let password_hash = hash_password(password)?;
         Ok(User {
             id: 0, // This will be set by the database
             username,
             password_hash,
-            email: String::new(),
             role,
-            created_at: 0,
-            last_login: None,
+            created_at: "".to_string(),
+            updated_at: "".to_string(),
         })
     }
 
@@ -123,7 +86,7 @@ pub fn verify_password(hash: &str, password: &str) -> bool {
         .is_ok()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     Admin,
