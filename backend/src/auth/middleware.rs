@@ -9,7 +9,8 @@ use crate::{
     models::user::Role,
     AppState,
 };
-use super::jwt;
+use crate::auth;
+use std::str::FromStr;
 
 pub async fn require_auth(
     State(state): State<AppState>,
@@ -27,7 +28,7 @@ pub async fn require_auth(
     };
 
     if let Some(token) = auth_header.strip_prefix("Bearer ") {
-        let claims = jwt::verify_token(token)?;
+        let claims = auth::verify_token(token)?;
         req.extensions_mut().insert(claims);
         Ok(next.run(req).await)
     } else {
@@ -40,10 +41,12 @@ pub async fn require_role(
     next: Next,
     required_role: Role,
 ) -> Result<Response, AppError> {
-    let claims = req.extensions().get::<jwt::Claims>()
+    let claims = req.extensions().get::<auth::Claims>()
         .ok_or_else(|| AppError::Auth("No claims found in request, ensure auth middleware is applied first".to_string()))?;
 
-    if claims.role >= required_role {
+    let claims_role = Role::from_str(&claims.role).map_err(|_| AppError::Auth("Invalid role in token".to_string()))?;
+
+    if claims_role >= required_role {
         Ok(next.run(req).await)
     } else {
         Err(AppError::Auth("Insufficient permissions".to_string()))

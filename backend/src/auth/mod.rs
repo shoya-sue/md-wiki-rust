@@ -1,14 +1,44 @@
 use serde::{Deserialize, Serialize};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use crate::error::AppError;
+use async_trait::async_trait;
+use axum::extract::FromRequestParts;
+use axum::http::request::Parts;
+use axum::http::StatusCode;
 
 pub mod middleware;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     pub sub: i64,  // user id
     pub exp: usize,  // expiration time
     pub role: String,
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for Claims
+where
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let auth_header = parts.headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|header| header.to_str().ok());
+
+        let auth_header = if let Some(auth_header) = auth_header {
+            auth_header
+        } else {
+            return Err(AppError::Auth("Missing authorization header".to_string()));
+        };
+
+        if let Some(token) = auth_header.strip_prefix("Bearer ") {
+            verify_token(token)
+        } else {
+            Err(AppError::Auth("Invalid authorization header format".to_string()))
+        }
+    }
 }
 
 pub fn create_token(user_id: i64, role: &str) -> Result<String, AppError> {

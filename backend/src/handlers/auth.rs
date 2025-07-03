@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 use crate::models::{LoginCredentials, UserRegistration, ChangePasswordRequest, User, Role};
-use crate::auth::jwt;
-use crate::auth::{Claims, create_token};
+use crate::auth;
 use crate::models::user::verify_password;
 use std::str::FromStr;
 
@@ -255,16 +254,9 @@ pub async fn get_user(
 // 自分のユーザー情報を取得
 pub async fn get_current_user(
     State(state): State<AppState>,
-    claims: jwt::Claims,
+    claims: auth::Claims,
 ) -> Result<Json<User>, (StatusCode, Json<serde_json::Value>)> {
-    let user_id = claims.sub.parse::<i64>().map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({
-                "error": "Invalid user ID in token"
-            })),
-        )
-    })?;
+    let user_id = claims.sub;
     
     get_user(State(state), Path(user_id)).await
 } 

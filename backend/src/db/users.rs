@@ -41,8 +41,8 @@ impl DbManager {
                 conn.execute(
                     "INSERT INTO users (username, password_hash, role, email, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                     params![username, password_hash, role_str, email, chrono::Utc::now().to_rfc3339(), chrono::Utc::now().to_rfc3339()],
-                )?;
-                Ok(conn.last_insert_rowid())
+                ).map_err(tokio_rusqlite::Error::Rusqlite)?;
+                Ok(conn.last_insert_rowid()).map_err(tokio_rusqlite::Error::Rusqlite)
             })
             .await.map_err(|e| AppError::Database(e.to_string()))
     }
@@ -51,12 +51,12 @@ impl DbManager {
         let username = username.to_string();
         self.conn
             .call(move |conn| {
-                conn.query_row(
+                Ok(conn.query_row(
                     "SELECT id, username, password_hash, role, created_at, updated_at FROM users WHERE username = ?1",
                     params![username],
                     User::from_row,
                 )
-                .optional()
+                .optional().map_err(tokio_rusqlite::Error::Rusqlite))
             })
             .await.map_err(|e| AppError::Database(e.to_string()))
     }
@@ -64,12 +64,12 @@ impl DbManager {
     pub async fn get_user_by_id(&self, user_id: i64) -> Result<Option<User>, AppError> {
         self.conn
             .call(move |conn| {
-                conn.query_row(
+                Ok(conn.query_row(
                     "SELECT id, username, password_hash, role, created_at, updated_at FROM users WHERE id = ?1",
                     params![user_id],
                     User::from_row,
                 )
-                .optional()
+                .optional().map_err(tokio_rusqlite::Error::Rusqlite))
             })
             .await.map_err(|e| AppError::Database(e.to_string()))
     }
@@ -78,12 +78,12 @@ impl DbManager {
         let username = username.to_string();
         self.conn
             .call(move |conn| {
-                conn.query_row(
+                Ok(conn.query_row(
                     "SELECT password_hash FROM users WHERE username = ?1",
                     params![username],
                     |row| row.get(0),
                 )
-                .optional()
+                .optional().map_err(tokio_rusqlite::Error::Rusqlite))
             })
             .await.map_err(|e| AppError::Database(e.to_string()))
     }
@@ -92,11 +92,11 @@ impl DbManager {
         let new_password_hash = new_password_hash.to_string();
         self.conn
             .call(move |conn| {
-                conn.execute(
+                Ok(conn.execute(
                     "UPDATE users SET password_hash = ?1 WHERE id = ?2",
                     params![new_password_hash, user_id],
                 )
-                .map(|_| ())
+                .map(|_| ()).map_err(tokio_rusqlite::Error::Rusqlite))
             })
             .await.map_err(|e| AppError::Database(e.to_string()))
     }
@@ -104,9 +104,9 @@ impl DbManager {
     pub async fn get_all_users(&self) -> Result<Vec<User>, AppError> {
         self.conn
             .call(move |conn| {
-                let mut stmt = conn.prepare("SELECT id, username, password_hash, role, created_at, updated_at FROM users")?;
-                let users_iter = stmt.query_map([], User::from_row)?;
-                users_iter.collect::<RusqliteResult<Vec<User>>>()
+                let mut stmt = conn.prepare("SELECT id, username, password_hash, role, created_at, updated_at FROM users").map_err(tokio_rusqlite::Error::Rusqlite)?;
+                let users_iter = stmt.query_map([], User::from_row).map_err(tokio_rusqlite::Error::Rusqlite)?;
+                Ok(users_iter.collect::<RusqliteResult<Vec<User>>>().map_err(tokio_rusqlite::Error::Rusqlite))
             })
             .await.map_err(|e| AppError::Database(e.to_string()))
     }
@@ -118,7 +118,7 @@ impl DbManager {
             let rows = conn.execute(
                 "UPDATE users SET role = ? WHERE username = ?",
                 params![new_role_clone, username_clone],
-            )?;
+            ).map_err(tokio_rusqlite::Error::Rusqlite)?;
             Ok(rows > 0)
         }).await.map_err(|e| AppError::Database(e.to_string()))
     }
@@ -129,16 +129,16 @@ impl DbManager {
             let rows = conn.execute(
                 "DELETE FROM users WHERE username = ?",
                 params![username_clone],
-            )?;
+            ).map_err(tokio_rusqlite::Error::Rusqlite)?;
             Ok(rows > 0)
         }).await.map_err(|e| AppError::Database(e.to_string()))
     }
 
     pub async fn list_users(&self) -> Result<Vec<User>, AppError> {
         self.conn.call(move |conn| {
-            let mut stmt = conn.prepare("SELECT id, username, password_hash, role, created_at, updated_at FROM users")?;
-            let users_iter = stmt.query_map([], User::from_row)?;
-            users_iter.collect::<RusqliteResult<Vec<User>>>()
+            let mut stmt = conn.prepare("SELECT id, username, password_hash, role, created_at, updated_at FROM users").map_err(tokio_rusqlite::Error::Rusqlite)?;
+            let users_iter = stmt.query_map([], User::from_row).map_err(tokio_rusqlite::Error::Rusqlite)?;
+            Ok(users_iter.collect::<RusqliteResult<Vec<User>>>().map_err(tokio_rusqlite::Error::Rusqlite))
         }).await.map_err(|e| AppError::Database(e.to_string()))
     }
 
