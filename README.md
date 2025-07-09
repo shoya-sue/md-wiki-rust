@@ -176,6 +176,13 @@ cargo run
     docker-compose down
     ```
 
+4.  **コンテナへのアクセス**:
+    実行中のコンテナのシェルにアクセスするには、以下のコマンドを実行します。
+
+    ```bash
+    docker-compose exec app /bin/bash
+    ```
+
 ### フロントエンド起動（Tauri）
 
 ```bash
