@@ -14,7 +14,7 @@ function DocumentList() {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3000/api/wiki');
+      const response = await fetch('http://localhost:3000/api/documents');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -34,7 +34,7 @@ function DocumentList() {
     if (!newDocName.trim()) return;
     
     try {
-      const response = await fetch(`http://localhost:3000/api/wiki/${newDocName}`, {
+      const response = await fetch(`http://localhost:3000/api/documents/${newDocName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
