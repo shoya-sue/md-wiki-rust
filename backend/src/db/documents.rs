@@ -111,4 +111,34 @@ impl DbManager {
             Ok(documents)
         }).await.map_err(|e| AppError::Database(e.to_string()))
     }
+
+    pub async fn list_recent_documents_meta(&self, limit: u32) -> Result<Vec<DocumentMeta>, AppError> {
+        self.conn.call(move |conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, filename, title, created_at, updated_at FROM documents ORDER BY updated_at DESC LIMIT ?"
+            )?;
+            
+            let docs_iter = stmt.query_map(params![limit], |row| {
+                Ok(DocumentMeta {
+                    id: row.get(0)?,
+                    filename: row.get(1)?,
+                    title: row.get(2)?,
+                    created_at: row.get(3)?,
+                    updated_at: row.get(4)?,
+                    tags: Vec::new(),
+                })
+            })?;
+
+            let mut documents = Vec::new();
+            for doc_result in docs_iter {
+                let mut doc = doc_result?;
+                let mut tag_stmt = conn.prepare("SELECT t.name FROM tags t JOIN document_tags dt ON t.id = dt.tag_id WHERE dt.document_id = ?")?;
+                let tags = tag_stmt.query_map(params![doc.id], |row| row.get(0))?.collect::<RusqliteResult<Vec<String>>>()?;
+                doc.tags = tags;
+                documents.push(doc);
+            }
+            
+            Ok(documents)
+        }).await.map_err(|e| AppError::Database(e.to_string()))
+    }
 }

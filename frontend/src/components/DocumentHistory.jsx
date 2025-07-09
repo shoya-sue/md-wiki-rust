@@ -12,7 +12,7 @@ function DocumentHistory() {
     const fetchHistory = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:3000/api/wiki/${filename}/history`);
+        const response = await fetch(`http://localhost:3000/api/documents/${filename}/history`);
         
         if (!response.ok) {
           throw new Error(`Error: ${response.status}`);

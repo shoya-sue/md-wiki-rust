@@ -16,7 +16,7 @@ function DocumentViewer() {
   const fetchDocument = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3000/api/wiki/${filename}`);
+      const response = await fetch(`http://localhost:3000/api/documents/${filename}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

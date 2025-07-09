@@ -147,6 +147,61 @@ pub async fn list_documents(
     Ok(Json(DocumentList { documents }))
 }
 
+#[derive(Deserialize)]
+pub struct RecentDocumentsQuery {
+    limit: Option<u32>,
+}
+
+#[derive(Serialize)]
+pub struct RecentDocument {
+    id: i64,
+    filename: String,
+    title: String,
+    created_at: String,
+    updated_at: String,
+    view_count: u32,
+    tags: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct RecentDocumentsResponse {
+    documents: Vec<RecentDocument>,
+}
+
+pub async fn list_recent_documents(
+    State(state): State<AppState>,
+    Query(query): Query<RecentDocumentsQuery>,
+) -> Result<Json<RecentDocumentsResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let limit = query.limit.unwrap_or(10);
+
+    let db_manager = state.db_manager.ok_or_else(|| {
+        (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": "Database not initialized" })))
+    })?;
+
+    match db_manager.list_recent_documents_meta(limit).await {
+        Ok(docs_meta) => {
+            let documents: Vec<RecentDocument> = docs_meta.into_iter().map(|meta| {
+                RecentDocument {
+                    id: meta.id,
+                    filename: meta.filename,
+                    title: meta.title.unwrap_or_else(|| "Untitled".to_string()),
+                    created_at: meta.created_at,
+                    updated_at: meta.updated_at,
+                    view_count: 0, // DBにview_countがないため、0を返す
+                    tags: meta.tags,
+                }
+            }).collect();
+            Ok(Json(RecentDocumentsResponse { documents }))
+        },
+        Err(e) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": format!("Failed to fetch recent documents: {}", e)
+            })),
+        )),
+    }
+}
+
 // 検索機能の実装
 pub async fn search_documents(
     State(state): State<AppState>,

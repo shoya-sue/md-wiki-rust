@@ -7,7 +7,7 @@ use axum::{
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use md_wiki_backend::{AppState, routes, config};
+use md_wiki_backend::{AppState, routes, config, db::DbManager};
 
 async fn health_check() -> &'static str {
     "OK"
@@ -35,8 +35,14 @@ async fn main() {
     });
 
     // アプリケーション状態の初期化
+    // アプリケーション状態の初期化
+    let db_manager = DbManager::new(std::path::Path::new(&config.database_url))
+        .await
+        .expect("Failed to initialize database manager");
+    db_manager.init().await.expect("Failed to initialize database schema");
+
     let state = AppState {
-        db_manager: None, // 必要に応じて初期化
+        db_manager: Some(db_manager),
         git_repo: None,   // 必要に応じて初期化
         markdown_dir,
         config: config.clone(),

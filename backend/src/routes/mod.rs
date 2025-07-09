@@ -35,6 +35,7 @@ pub fn create_router(state: AppState) -> Router {
     let document_routes = Router::new()
         .route("/", get(list_documents).post(save_document))
         .route("/search", get(search_documents))
+        .route("/recent", get(list_recent_documents))
         .route("/:filename", 
             get(get_document)
                 .put(save_document)

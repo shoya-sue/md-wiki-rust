@@ -21,7 +21,7 @@ function SearchResults() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`http://localhost:3000/api/wiki/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`http://localhost:3000/api/documents/search?q=${encodeURIComponent(query)}`);
       
       if (!response.ok) {
         throw new Error(`検索に失敗しました: ${response.status}`);

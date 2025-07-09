@@ -16,7 +16,7 @@ function DocumentEditor() {
   const fetchDocument = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3000/api/wiki/${filename}`);
+      const response = await fetch(`http://localhost:3000/api/documents/${filename}`);
       
       if (response.status === 404) {
         // Create a new document if it doesn't exist
@@ -43,7 +43,7 @@ function DocumentEditor() {
   const saveDocument = async () => {
     try {
       setSaved(false);
-      const response = await fetch(`http://localhost:3000/api/wiki/${filename}`, {
+      const response = await fetch(`http://localhost:3000/api/documents/${filename}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

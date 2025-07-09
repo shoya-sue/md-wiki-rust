@@ -13,7 +13,7 @@ function DocumentVersionViewer() {
     const fetchDocumentVersion = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:3000/api/wiki/${filename}/version/${commitId}`);
+        const response = await fetch(`http://localhost:3000/api/documents/${filename}/version/${commitId}`);
         
         if (!response.ok) {
           throw new Error(`Error: ${response.status}`);

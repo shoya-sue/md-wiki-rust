@@ -23,7 +23,7 @@ function MetadataEditor() {
         setLoading(true);
         
         // メタデータを取得
-        const metaResponse = await fetch(`http://localhost:3000/api/wiki/${filename}/metadata`);
+        const metaResponse = await fetch(`http://localhost:3000/api/documents/${filename}/metadata`);
         
         // タグ一覧を取得
         const tagsResponse = await fetch('http://localhost:3000/api/tags');
@@ -66,7 +66,7 @@ function MetadataEditor() {
     e.preventDefault();
     
     try {
-      const response = await fetch(`http://localhost:3000/api/wiki/${filename}/metadata`, {
+      const response = await fetch(`http://localhost:3000/api/documents/${filename}/metadata`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
