@@ -14,6 +14,7 @@ use crate::handlers::{
         get_document_history,
         get_document_version,
         delete_document,
+        list_recent_documents, // この行を追加
     },
     metadata::{
         get_document_metadata,
