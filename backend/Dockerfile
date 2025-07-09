@@ -31,7 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # ビルドされたバイナリをコピー
-COPY --from=builder /app/backend/target/release/md-wiki-rust-backend .
+COPY --from=builder /app/backend/target/release/md-wiki-backend .
 
 # migrationsとstorageディレクトリを作成
 RUN mkdir -p /app/migrations /app/storage
@@ -46,4 +46,4 @@ USER appuser
 EXPOSE 3000
 
 # 起動コマンド
-CMD ["./md-wiki-rust-backend"]
+CMD ["./md-wiki-backend"]

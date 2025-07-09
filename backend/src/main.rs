@@ -7,7 +7,7 @@ use axum::{
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use md_wiki_rust_backend::{AppState, routes, config};
+use md_wiki_backend::{AppState, routes, config};
 
 async fn health_check() -> &'static str {
     "OK"
