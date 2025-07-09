@@ -1,0 +1,32 @@
+# ベースイメージとしてAlmaLinux 9を使用
+FROM almalinux:9
+
+# 環境変数を設定（非対話的インストールのため）
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 必要なパッケージとTauriの依存関係をインストール
+# Development Toolsグループをインストール
+RUN dnf -y groupinstall "Development Tools" &&     dnf -y install wget file openssl-devel webkit2gtk3-devel gtk3-devel libsoup-devel ca-certificates gnupg && \
+
+# Node.js 20.x をインストール
+RUN curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && \
+    dnf -y install nodejs && \
+    dnf clean all
+
+# Rustをインストール
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# ユーザーを作成して権限を付与
+RUN useradd -m -s /bin/bash devuser
+RUN chown -R devuser:devuser /app
+RUN chown -R devuser:devuser ${CARGO_HOME}
+USER devuser
+
+# コンテナが起動しっぱなしになるようにする
+CMD ["tail", "-f", "/dev/null"]

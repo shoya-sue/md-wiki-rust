@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import '../styles.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 function DocumentVersionViewer() {
   const { filename, commitId } = useParams();
   const [document, setDocument] = useState(null);
@@ -13,7 +15,7 @@ function DocumentVersionViewer() {
     const fetchDocumentVersion = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:3000/api/documents/${filename}/version/${commitId}`);
+        const response = await fetch(`${API_BASE_URL}/api/documents/${filename}/version/${commitId}`);
         
         if (!response.ok) {
           throw new Error(`Error: ${response.status}`);

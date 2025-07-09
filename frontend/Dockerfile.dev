@@ -1,0 +1,45 @@
+# ベースイメージとしてUbuntu 22.04を使用
+FROM ubuntu:22.04
+
+# 環境変数を設定（非対話的インストールのため）
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 必要なパッケージとTauriの依存関係をインストール
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    wget \
+    file \
+    libssl-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    libwebkit2gtk-4.0-dev \
+    # Node.jsのインストール準備
+    ca-certificates \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js 20.x をインストール
+RUN mkdir -p /etc/apt/keyrings
+RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+RUN apt-get update && apt-get install -y nodejs
+
+# Rustをインストール
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# 作業ディレクトリを設定
+WORKDIR /app
+
+# ユーザーを作成して権限を付与
+RUN useradd -m -s /bin/bash devuser
+RUN chown -R devuser:devuser /app
+RUN chown -R devuser:devuser ${CARGO_HOME}
+USER devuser
+
+# コンテナが起動しっぱなしになるようにする
+CMD ["tail", "-f", "/dev/null"]

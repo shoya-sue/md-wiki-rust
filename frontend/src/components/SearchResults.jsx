@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 function SearchResults() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
@@ -21,7 +23,7 @@ function SearchResults() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`http://localhost:3000/api/documents/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`${API_BASE_URL}/api/documents/search?q=${encodeURIComponent(query)}`);
       
       if (!response.ok) {
         throw new Error(`検索に失敗しました: ${response.status}`);

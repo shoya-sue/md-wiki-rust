@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 function DocumentList() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +16,7 @@ function DocumentList() {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3000/api/documents');
+      const response = await fetch(`${API_BASE_URL}/api/documents`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -34,7 +36,7 @@ function DocumentList() {
     if (!newDocName.trim()) return;
     
     try {
-      const response = await fetch(`http://localhost:3000/api/documents/${newDocName}`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${newDocName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,6 +58,7 @@ function DocumentList() {
       console.error('Error creating document:', err);
     }
   };
+
 
   return (
     <div className="document-list">

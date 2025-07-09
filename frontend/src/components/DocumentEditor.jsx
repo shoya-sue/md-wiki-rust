@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 function DocumentEditor() {
   const { filename } = useParams();
   const navigate = useNavigate();
@@ -16,7 +18,7 @@ function DocumentEditor() {
   const fetchDocument = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3000/api/documents/${filename}`);
+      const response = await fetch(`${API_BASE_URL}/api/documents/${filename}`);
       
       if (response.status === 404) {
         // Create a new document if it doesn't exist
@@ -43,7 +45,7 @@ function DocumentEditor() {
   const saveDocument = async () => {
     try {
       setSaved(false);
-      const response = await fetch(`http://localhost:3000/api/documents/${filename}`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${filename}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -65,6 +67,7 @@ function DocumentEditor() {
       console.error('Error saving document:', err);
     }
   };
+
 
   const handleViewDocument = () => {
     navigate(`/view/${filename}`);

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 function TagManager() {
   const [tags, setTags] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ function TagManager() {
     const fetchTags = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:3000/api/tags');
+        const response = await fetch(`${API_BASE_URL}/api/tags`);
         
         if (!response.ok) {
           throw new Error(`Error: ${response.status}`);
@@ -43,7 +45,7 @@ function TagManager() {
     const fetchDocumentsByTag = async () => {
       try {
         setDocumentsLoading(true);
-        const response = await fetch(`http://localhost:3000/api/tags/search?tag=${encodeURIComponent(selectedTag)}`);
+        const response = await fetch(`${API_BASE_URL}/api/tags/search?tag=${encodeURIComponent(selectedTag)}`);
         
         if (!response.ok) {
           throw new Error(`Error: ${response.status}`);

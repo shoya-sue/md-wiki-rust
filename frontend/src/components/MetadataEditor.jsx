@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import '../styles.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 function MetadataEditor() {
   const { filename } = useParams();
   const navigate = useNavigate();
@@ -23,10 +25,10 @@ function MetadataEditor() {
         setLoading(true);
         
         // メタデータを取得
-        const metaResponse = await fetch(`http://localhost:3000/api/documents/${filename}/metadata`);
+        const metaResponse = await fetch(`${API_BASE_URL}/api/documents/${filename}/metadata`);
         
         // タグ一覧を取得
-        const tagsResponse = await fetch('http://localhost:3000/api/tags');
+        const tagsResponse = await fetch(`${API_BASE_URL}/api/tags`);
         
         if (!tagsResponse.ok) {
           throw new Error(`Failed to fetch tags: ${tagsResponse.status}`);
@@ -66,7 +68,7 @@ function MetadataEditor() {
     e.preventDefault();
     
     try {
-      const response = await fetch(`http://localhost:3000/api/documents/${filename}/metadata`, {
+      const response = await fetch(`${API_BASE_URL}/api/documents/${filename}/metadata`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

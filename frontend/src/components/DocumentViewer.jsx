@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+
 function DocumentViewer() {
   const { filename } = useParams();
   const navigate = useNavigate();
@@ -16,7 +18,7 @@ function DocumentViewer() {
   const fetchDocument = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://localhost:3000/api/documents/${filename}`);
+      const response = await fetch(`${API_BASE_URL}/api/documents/${filename}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
