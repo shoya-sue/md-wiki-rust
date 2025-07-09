@@ -147,10 +147,34 @@ git init
 
 ### バックエンド起動
 
+#### 通常の起動
+
 ```bash
 cd backend
 cargo run
 ```
+
+#### Dockerを使用した起動
+
+1.  **.envファイルの作成**:
+    リポジトリのルートに`.env`ファイルを作成し、環境変数を設定します。
+
+    ```
+    DATABASE_URL=sqlite:/app/storage/metadata.db
+    JWT_SECRET=your_jwt_secret
+    ```
+
+2.  **Dockerコンテナのビルドと起動**:
+
+    ```bash
+    docker-compose up --build -d
+    ```
+
+3.  **コンテナの停止**:
+
+    ```bash
+    docker-compose down
+    ```
 
 ### フロントエンド起動（Tauri）
 
