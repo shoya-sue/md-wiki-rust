@@ -1,12 +1,11 @@
-use std::fmt;
-use git2::{Repository, Signature, Time, Commit, Oid, ObjectType, Error as GitError};
+use git2::{Repository, Signature, Time, Commit, Oid, Error as GitError};
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::Arc;
 use parking_lot::Mutex;
 use serde::{Serialize, Deserialize};
 use chrono::DateTime;
-use crate::error::AppError;
+
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitInfo {
@@ -91,8 +90,8 @@ impl GitRepository {
             
             if let Some(parent) = commit.parent(0).ok() {
                 let diff = repo.diff_tree_to_tree(
-                    Some(&parent.tree()?),
-                    Some(&commit.tree()?),
+                    Some(&parent.tree()?), 
+                    Some(&commit.tree()?), 
                     None,
                 )?;
 

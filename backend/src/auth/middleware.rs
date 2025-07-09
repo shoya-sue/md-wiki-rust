@@ -1,6 +1,6 @@
 use axum::{
     extract::State,
-    http::{Request, StatusCode},
+    http::Request,
     middleware::Next,
     response::Response,
 };
@@ -13,7 +13,7 @@ use crate::auth;
 use std::str::FromStr;
 
 pub async fn require_auth(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     mut req: Request<axum::body::Body>,
     next: Next,
 ) -> Result<Response, AppError> {

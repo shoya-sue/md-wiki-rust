@@ -32,5 +32,5 @@ impl DbManager {
 }
 
 pub use crate::models::user::User;
-pub use documents::DocumentMeta;
-pub use tags::Tag; 
+pub use documents::{DocumentMeta, self as document_ops};
+pub use tags::{Tag, self as tag_ops}; 

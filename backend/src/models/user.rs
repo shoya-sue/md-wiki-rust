@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
 use argon2::{
     password_hash::{
-        rand_core::OsRng,
-        PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
+        PasswordHash, PasswordHasher, PasswordVerifier, SaltString
     },
     Argon2,
 };
-use rand::Rng;
+use rand::rngs::OsRng;
+
 use std::fmt;
 use std::str::FromStr;
 

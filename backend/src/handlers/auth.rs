@@ -3,12 +3,12 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use serde::{Deserialize, Serialize};
+
 
 use crate::AppState;
 use crate::models::{LoginCredentials, UserRegistration, ChangePasswordRequest, User, Role};
 use crate::auth;
-use crate::models::user::verify_password;
+
 use std::str::FromStr;
 
 // ユーザー登録

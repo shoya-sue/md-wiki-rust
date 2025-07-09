@@ -73,15 +73,14 @@ pub async fn update_document_metadata(
         }
     };
     
-    // 現在のUNIXタイムスタンプを取得
-    let now = SystemTime::now()
+    let _now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs() as i64;
     
     // 既存のメタデータを取得または新規作成
     match db.get_document_metadata(&filename).await {
-        Ok(Some(mut existing_meta)) => {
+        Ok(Some(_existing_meta)) => {
             // 既存のメタデータを更新
             match db.update_document_metadata(&filename, Some(&meta_request.title)).await {
                 Ok(_) => Ok(StatusCode::OK),
